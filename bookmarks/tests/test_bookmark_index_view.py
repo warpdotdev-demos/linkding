@@ -685,7 +685,7 @@ class BookmarkIndexViewTestCase(
         response = self.client.get(reverse("linkding:bookmarks.index"))
         html = response.content.decode()
         self.assertNotIn("Search all bookmarks", html)
-        self.assertNotIn("Back to", html)
+        self.assertNotIn("search-global-toggle", html)
 
         # Bundle selected, no global_search → "Search all bookmarks" link present
         response = self.client.get(
@@ -702,7 +702,7 @@ class BookmarkIndexViewTestCase(
         )
         html = response.content.decode()
         self.assertNotIn("Search all bookmarks", html)
-        self.assertIn("My Bundle", html)
+        self.assertIn("↩ My Bundle", html)
 
     def test_global_search_preserved_in_search_form(self):
         bundle = self.setup_bundle()
