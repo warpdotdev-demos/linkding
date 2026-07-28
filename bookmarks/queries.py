@@ -265,8 +265,8 @@ def _base_bookmarks_query(
     elif search.shared == BookmarkSearch.FILTER_SHARED_UNSHARED:
         query_set = query_set.filter(shared=False)
 
-    # Filter by bundle
-    if search.bundle:
+    # Filter by bundle (skipped when global_search is active)
+    if search.bundle and not search.global_search:
         query_set = _filter_bundle(query_set, search.bundle)
 
     # Sort

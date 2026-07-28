@@ -244,6 +244,7 @@ class BookmarkSearch:
         "unread",
         "modified_since",
         "added_since",
+        "global_search",
     ]
     preferences = ["sort", "shared", "unread"]
     defaults = {
@@ -255,6 +256,7 @@ class BookmarkSearch:
         "unread": FILTER_UNREAD_OFF,
         "modified_since": None,
         "added_since": None,
+        "global_search": "",
     }
 
     def __init__(
@@ -267,6 +269,7 @@ class BookmarkSearch:
         unread: str = None,
         modified_since: str = None,
         added_since: str = None,
+        global_search: str = None,
         preferences: dict = None,
         request: any = None,
     ):
@@ -283,6 +286,7 @@ class BookmarkSearch:
         self.unread = unread or self.defaults["unread"]
         self.modified_since = modified_since or self.defaults["modified_since"]
         self.added_since = added_since or self.defaults["added_since"]
+        self.global_search = global_search or self.defaults["global_search"]
 
     def is_modified(self, param):
         value = self.__dict__[param]

@@ -632,3 +632,111 @@ class BookmarkIndexViewTestCase(
         html = response.content.decode()
 
         self.assertInHTML('<h2 id="bundles-heading">Bundles</h2>', html, count=0)
+
+    def test_global_search_ignores_bundle_filter(self):
+        # bookmarks matching the bundle filter (prefix "foo")
+        bundle_bookmarks = self.setup_numbered_bookmarks(3, prefix="foo")
+        # bookmarks outside the bundle filter
+        other_bookmarks = self.setup_numbered_bookmarks(3, prefix="bar")
+
+        bundle = self.setup_bundle(search="foo")
+
+        # With global_search=1, all bookmarks should be visible despite bundle filter
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+
+        self.assertVisibleBookmarks(response, bundle_bookmarks + other_bookmarks)
+
+    def test_global_search_tag_cloud_shows_all_tags(self):
+        # Bookmarks with tags that match the bundle filter
+        bundle_bookmarks = self.setup_numbered_bookmarks(
+            3, with_tags=True, prefix="foo", tag_prefix="foo"
+        )
+        # Bookmarks with tags outside the bundle filter
+        outside_bookmarks = self.setup_numbered_bookmarks(
+            3, with_tags=True, prefix="bar", tag_prefix="bar"
+        )
+
+        bundle = self.setup_bundle(search="foo")
+
+        bundle_tags = self.get_tags_from_bookmarks(bundle_bookmarks)
+        outside_tags = self.get_tags_from_bookmarks(outside_bookmarks)
+
+        # Without global_search, only bundle tags should be visible
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        self.assertVisibleTags(response, bundle_tags)
+        self.assertInvisibleTags(response, outside_tags)
+
+        # With global_search=1, all tags should be visible
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+        self.assertVisibleTags(response, bundle_tags + outside_tags)
+
+    def test_global_search_ui_control(self):
+        bundle = self.setup_bundle(name="My Bundle")
+
+        # No bundle selected → neither "Search all bookmarks" nor "Back to" link
+        response = self.client.get(reverse("linkding:bookmarks.index"))
+        html = response.content.decode()
+        self.assertNotIn("Search all bookmarks", html)
+        self.assertNotIn("Back to", html)
+
+        # Bundle selected, no global_search → "Search all bookmarks" link present
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        html = response.content.decode()
+        self.assertIn("Search all bookmarks", html)
+        self.assertNotIn("\u21a9 My Bundle", html)
+
+        # Bundle selected, global_search=1 → "Back to [bundle name]" link present
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+        html = response.content.decode()
+        self.assertNotIn("Search all bookmarks", html)
+        self.assertIn("My Bundle", html)
+
+    def test_global_search_preserved_in_search_form(self):
+        bundle = self.setup_bundle()
+
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+        html = response.content.decode()
+        soup = self.make_soup(html)
+
+        # The hidden field for global_search must be inside the search form
+        search_form = soup.select_one("form#search")
+        self.assertIsNotNone(search_form)
+        hidden_global_search = search_form.select_one(
+            'input[type="hidden"][name="global_search"][value="1"]'
+        )
+        self.assertIsNotNone(hidden_global_search)
+
+    def test_bundle_search_url_removes_global_search(self):
+        bundle = self.setup_bundle(name="My Bundle")
+
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1&q=test"
+        )
+        html = response.content.decode()
+        soup = self.make_soup(html)
+
+        # The "Back to" link should not contain global_search
+        # but should contain bundle=<id> and q=test
+        back_link = soup.select_one("a.search-global-toggle")
+        self.assertIsNotNone(back_link)
+        href = back_link.attrs["href"]
+        self.assertNotIn("global_search", href)
+        self.assertIn(f"bundle={bundle.id}", href)
+        self.assertIn("q=test", href)

@@ -301,3 +301,26 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
                 "unread": BookmarkSearch.FILTER_UNREAD_OFF,
             },
         )
+
+    def test_global_search_from_request(self):
+        user = self.get_or_create_test_user()
+        request = MockRequest(user)
+        bundle = self.setup_bundle()
+
+        # not present → default empty string, not modified
+        query_dict = QueryDict(f"bundle={bundle.id}")
+        search = BookmarkSearch.from_request(request, query_dict)
+        self.assertEqual(search.global_search, "")
+        self.assertFalse(search.is_modified("global_search"))
+        self.assertNotIn("global_search", search.query_params)
+
+        # global_search=1 → value "1", modified, appears in query_params
+        query_dict = QueryDict(f"bundle={bundle.id}&global_search=1")
+        search = BookmarkSearch.from_request(request, query_dict)
+        self.assertEqual(search.global_search, "1")
+        self.assertTrue(search.is_modified("global_search"))
+        self.assertIn("global_search", search.query_params)
+        self.assertEqual(search.query_params["global_search"], "1")
+
+        # global_search is not a preference — not in BookmarkSearch.preferences
+        self.assertNotIn("global_search", BookmarkSearch.preferences)
