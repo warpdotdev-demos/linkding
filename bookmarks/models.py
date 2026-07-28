@@ -239,6 +239,7 @@ class BookmarkSearch:
         "q",
         "user",
         "bundle",
+        "global_search",
         "sort",
         "shared",
         "unread",
@@ -250,6 +251,7 @@ class BookmarkSearch:
         "q": "",
         "user": "",
         "bundle": None,
+        "global_search": None,
         "sort": SORT_ADDED_DESC,
         "shared": FILTER_SHARED_OFF,
         "unread": FILTER_UNREAD_OFF,
@@ -262,6 +264,7 @@ class BookmarkSearch:
         q: str = None,
         user: str = None,
         bundle: BookmarkBundle = None,
+        global_search: str = None,
         sort: str = None,
         shared: str = None,
         unread: str = None,
@@ -278,6 +281,7 @@ class BookmarkSearch:
         self.q = q or self.defaults["q"]
         self.user = user or self.defaults["user"]
         self.bundle = bundle or self.defaults["bundle"]
+        self.global_search = global_search or self.defaults["global_search"]
         self.sort = sort or self.defaults["sort"]
         self.shared = shared or self.defaults["shared"]
         self.unread = unread or self.defaults["unread"]

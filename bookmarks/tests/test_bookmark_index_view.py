@@ -632,3 +632,65 @@ class BookmarkIndexViewTestCase(
         html = response.content.decode()
 
         self.assertInHTML('<h2 id="bundles-heading">Bundles</h2>', html, count=0)
+
+    def test_global_search_link_shown_when_bundle_active(self):
+        # With bundle selected and no global_search: "Search all bookmarks" appears
+        bundle = self.setup_bundle(name="My Bundle")
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        html = response.content.decode()
+        self.assertIn("Search all bookmarks", html)
+        self.assertNotIn("Back to", html)
+
+    def test_global_search_link_absent_without_bundle(self):
+        # Without bundle: "Search all bookmarks" is absent
+        response = self.client.get(reverse("linkding:bookmarks.index"))
+        html = response.content.decode()
+        self.assertNotIn("Search all bookmarks", html)
+
+    def test_global_search_back_link_shown_when_active(self):
+        # With bundle selected and global_search=1: "Back to..." link appears
+        bundle = self.setup_bundle(name="My Bundle")
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+        html = response.content.decode()
+        self.assertIn("Back to", html)
+        self.assertIn(bundle.name, html)
+        self.assertNotIn("Search all bookmarks", html)
+
+    def test_global_search_hidden_field_in_form(self):
+        # With bundle selected and global_search=1:
+        # search form carries a hidden global_search field
+        bundle = self.setup_bundle(name="My Bundle")
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+        html = response.content.decode()
+        self.assertIn('name="global_search"', html)
+        self.assertIn('value="1"', html)
+
+    def test_global_search_bypasses_bundle_filter(self):
+        # With global_search=1 and a bundle active,
+        # bookmarks NOT matching the bundle filter are still returned.
+        bundle = self.setup_bundle(search="bundle_term")
+        bundle_bookmark = self.setup_bookmark(title="bundle_term content")
+        other_bookmark = self.setup_bookmark(title="unrelated bookmark")
+
+        # Without global_search: only bundle_bookmark
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        self.assertContains(response, bundle_bookmark.title)
+        self.assertNotContains(response, other_bookmark.title)
+
+        # With global_search=1: both bookmarks visible
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+        self.assertContains(response, bundle_bookmark.title)
+        self.assertContains(response, other_bookmark.title)

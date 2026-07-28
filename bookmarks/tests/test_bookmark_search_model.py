@@ -263,6 +263,17 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
         )
         self.assertTrue(bookmark_search.has_modifications)
 
+    def test_from_request_global_search(self):
+        # global_search=1 in query dict → search.global_search == "1"
+        query_dict = QueryDict("global_search=1")
+        search = BookmarkSearch.from_request(None, query_dict)
+        self.assertEqual(search.global_search, "1")
+
+        # no global_search param → search.global_search is None (the default)
+        query_dict = QueryDict()
+        search = BookmarkSearch.from_request(None, query_dict)
+        self.assertIsNone(search.global_search)
+
     def test_preferences_dict(self):
         # no params
         bookmark_search = BookmarkSearch()

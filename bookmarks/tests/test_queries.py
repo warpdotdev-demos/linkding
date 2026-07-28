@@ -1584,6 +1584,29 @@ class QueriesBasicTestCase(TestCase, BookmarkFactoryMixin):
         )
         self.assertQueryResult(query, [matching_bookmarks])
 
+    def test_query_bookmarks_global_search_bypasses_bundle(self):
+        # Bundle filtering only term "bundle_only_term"
+        bundle = self.setup_bundle(search="bundle_only_term")
+
+        # Bookmark A matches the bundle's search term
+        bookmark_a = self.setup_bookmark(title="bundle_only_term content")
+        # Bookmark B does NOT match the bundle's search term
+        bookmark_b = self.setup_bookmark(title="unrelated bookmark")
+
+        # Without global_search: only bookmark_a is returned
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="", bundle=bundle)
+        )
+        self.assertQueryResult(query, [[bookmark_a]])
+
+        # With global_search="1": both bookmarks are returned
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(q="", bundle=bundle, global_search="1"),
+        )
+        self.assertQueryResult(query, [[bookmark_a, bookmark_b]])
+
     def test_query_archived_bookmarks_with_bundle(self):
         bundle = self.setup_bundle(any_tags="bundleTag1 bundleTag2")
 
