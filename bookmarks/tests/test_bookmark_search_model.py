@@ -1,6 +1,8 @@
 from django.http import QueryDict
 from django.test import TestCase
 
+from bookmarks import queries
+from bookmarks.forms import BookmarkSearchForm
 from bookmarks.models import BookmarkSearch
 from bookmarks.tests.helpers import BookmarkFactoryMixin
 
@@ -301,3 +303,66 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
                 "unread": BookmarkSearch.FILTER_UNREAD_OFF,
             },
         )
+
+
+class GlobalSearchModelTest(TestCase, BookmarkFactoryMixin):
+    """Regression tests for OSFG-38: global search bypasses bundle filter."""
+
+    def setUp(self):
+        user = self.get_or_create_test_user()
+        self.profile = user.profile
+
+    def test_global_search_ignores_bundle_filter(self):
+        """With global_search=1, bookmarks outside the selected bundle appear in results."""
+        # Bundle matches bookmarks containing "bundle_term"
+        bundle = self.setup_bundle(search="bundle_term")
+
+        # Bookmark inside the bundle scope
+        bundle_bookmark = self.setup_bookmark(title="bundle_term content")
+        # Bookmark outside the bundle scope
+        other_bookmark = self.setup_bookmark(title="unrelated content")
+
+        # Without global_search: only bundle-scoped results
+        search = BookmarkSearch(bundle=bundle)
+        result = list(queries.query_bookmarks(self.user, self.profile, search))
+        self.assertIn(bundle_bookmark, result)
+        self.assertNotIn(other_bookmark, result)
+
+        # With global_search=1: bundle filter is bypassed, all bookmarks appear
+        search = BookmarkSearch(bundle=bundle, global_search="1")
+        result = list(queries.query_bookmarks(self.user, self.profile, search))
+        self.assertIn(bundle_bookmark, result)
+        self.assertIn(other_bookmark, result)
+
+    def test_global_search_preserved_in_search_form(self):
+        """BookmarkSearchForm hidden_fields() serialises global_search=1 so it survives form submission."""
+        bundle = self.setup_bundle()
+        search = BookmarkSearch(bundle=bundle, global_search="1")
+        form = BookmarkSearchForm(search, editable_fields=["q"])
+
+        hidden_field_names = [field.html_name for field in form.hidden_fields()]
+        self.assertIn("global_search", hidden_field_names)
+
+        global_search_field = next(
+            (f for f in form.hidden_fields() if f.html_name == "global_search"), None
+        )
+        self.assertIsNotNone(global_search_field)
+        self.assertEqual(global_search_field.value(), "1")
+
+    def test_global_search_no_bundle_is_noop(self):
+        """global_search=1 without a bundle param is a no-op: all bookmarks returned as normal."""
+        bookmark1 = self.setup_bookmark(title="bookmark one")
+        bookmark2 = self.setup_bookmark(title="bookmark two")
+
+        search = BookmarkSearch(global_search="1")
+        self.assertIsNone(search.bundle)
+
+        result = list(queries.query_bookmarks(self.user, self.profile, search))
+        self.assertIn(bookmark1, result)
+        self.assertIn(bookmark2, result)
+
+        # Identical to the no-params result
+        result_no_params = list(
+            queries.query_bookmarks(self.user, self.profile, BookmarkSearch())
+        )
+        self.assertCountEqual(result, result_no_params)

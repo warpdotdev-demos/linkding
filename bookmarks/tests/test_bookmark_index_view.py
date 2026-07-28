@@ -632,3 +632,53 @@ class BookmarkIndexViewTestCase(
         html = response.content.decode()
 
         self.assertInHTML('<h2 id="bundles-heading">Bundles</h2>', html, count=0)
+
+
+    def test_global_search_ui_toggle_visibility(self):
+        """Toggle appears when bundle is selected, changes to back-link when global_search=1."""
+        bundle = self.setup_bundle(name="Favorites")
+
+        # No bundle selected: no toggle shown
+        response = self.client.get(reverse("linkding:bookmarks.index"))
+        html = response.content.decode()
+        self.assertNotIn("Search all bookmarks", html)
+
+        # Bundle selected, no global_search: "Search all bookmarks" link shown
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        html = response.content.decode()
+        self.assertIn("Search all bookmarks", html)
+
+        # Bundle selected, global_search=1: back-link with bundle name shown
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}&global_search=1"
+        )
+        html = response.content.decode()
+        self.assertNotIn("Search all bookmarks", html)
+        self.assertIn("Favorites", html)
+
+    def test_global_search_tag_cloud_shows_all_tags(self):
+        """Tag cloud shows all matching tags when global_search=1 is active."""
+        bundle = self.setup_bundle(search="bundle_term")
+
+        # Bookmark inside the bundle scope
+        bundle_tag = self.setup_tag(name="bundle_tag")
+        self.setup_bookmark(title="bundle_term content", tags=[bundle_tag])
+
+        # Bookmark outside the bundle scope
+        other_tag = self.setup_tag(name="other_tag")
+        self.setup_bookmark(title="unrelated content", tags=[other_tag])
+
+        # With bundle only: tag cloud scoped to bundle
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        self.assertVisibleTags(response, [bundle_tag])
+        self.assertInvisibleTags(response, [other_tag])
+
+        # With global_search=1: tag cloud includes all tags
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}&global_search=1"
+        )
+        self.assertVisibleTags(response, [bundle_tag, other_tag])

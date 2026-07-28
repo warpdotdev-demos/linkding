@@ -271,6 +271,7 @@ class BookmarkSearchForm(forms.Form):
     unread = forms.ChoiceField(choices=FILTER_UNREAD_CHOICES, widget=forms.RadioSelect)
     modified_since = forms.CharField(required=False)
     added_since = forms.CharField(required=False)
+    global_search = forms.CharField(required=False)
 
     def __init__(
         self,

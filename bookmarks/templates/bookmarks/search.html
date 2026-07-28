@@ -12,6 +12,11 @@
     </ld-search-autocomplete>
     <input type="submit" value="Search" class="d-none">
     {% for hidden_field in search_form.hidden_fields %}{{ hidden_field }}{% endfor %}
+    {% if search.bundle and not search.global_search %}
+      <a href="{{ global_search_url }}" class="global-search-toggle">Search all bookmarks</a>
+    {% elif search.bundle and search.global_search %}
+      <a href="{{ bundle_search_url }}" class="global-search-toggle">&#x21A9; {{ search.bundle.name }}</a>
+    {% endif %}
   </form>
   <ld-dropdown class="search-options dropdown dropdown-right">
     <button type="button"
