@@ -632,3 +632,53 @@ class BookmarkIndexViewTestCase(
         html = response.content.decode()
 
         self.assertInHTML('<h2 id="bundles-heading">Bundles</h2>', html, count=0)
+
+    def test_global_search_ignores_bundle_filter(self):
+        # Create a bundle that restricts to "foo" bookmarks
+        bundle = self.setup_bundle(search="foo", name="Foo bundle")
+
+        # Bookmarks inside the bundle filter
+        self.setup_numbered_bookmarks(2, prefix="foo")
+        # Bookmark outside the bundle filter — matches query "bookmark" but not "foo"
+        outside_bookmark = self.setup_bookmark(title="outside bookmark")
+
+        # (1) Plain bundle search: outside_bookmark is invisible
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}&q=bookmark"
+        )
+        html = response.content.decode()
+        self.assertNotContains(response, outside_bookmark.title)
+
+        # (2) Toggle link "Search all bookmarks" is present when bundle + q
+        self.assertInHTML(
+            f'<a href="?bundle={bundle.id}&amp;q=bookmark&amp;global_search=1">Search all bookmarks</a>',
+            html,
+        )
+
+        # (3) global_search=1 bypasses the bundle filter — outside_bookmark is now visible
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&q=bookmark&global_search=1"
+        )
+        html = response.content.decode()
+        self.assertContains(response, outside_bookmark.title)
+
+        # (4) Toggle flips to "Search in [bundle name]" when global_search=1
+        self.assertInHTML(
+            f'<a href="?bundle={bundle.id}&amp;q=bookmark">Search in {bundle.name}</a>',
+            html,
+        )
+
+        # (5) No toggle when no bundle is selected (only q)
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + "?q=bookmark"
+        )
+        html = response.content.decode()
+        self.assertNotIn('class="global-search-hint"', html)
+
+        # (6) No toggle when bundle is selected but query is empty
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        html = response.content.decode()
+        self.assertNotIn('class="global-search-hint"', html)

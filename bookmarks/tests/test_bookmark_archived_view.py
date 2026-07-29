@@ -616,3 +616,36 @@ class BookmarkArchivedViewTestCase(
         html = response.content.decode()
 
         self.assertInHTML('<h2 id="bundles-heading">Bundles</h2>', html, count=0)
+
+    def test_global_search_ignores_bundle_filter(self):
+        # Create a bundle that restricts to "foo" archived bookmarks
+        bundle = self.setup_bundle(search="foo", name="Foo bundle")
+
+        # Archived bookmarks inside the bundle filter
+        self.setup_numbered_bookmarks(2, prefix="foo", archived=True)
+        # Archived bookmark outside the bundle filter
+        outside_bookmark = self.setup_bookmark(
+            title="outside archived bookmark", is_archived=True
+        )
+
+        # (1) Plain bundle search on archived view: outside_bookmark is invisible
+        response = self.client.get(
+            reverse("linkding:bookmarks.archived")
+            + f"?bundle={bundle.id}&q=archived+bookmark"
+        )
+        self.assertNotContains(response, outside_bookmark.title)
+
+        # (2) Toggle link "Search all bookmarks" is present when bundle + q
+        html = response.content.decode()
+        self.assertIn("Search all bookmarks", html)
+
+        # (3) global_search=1 bypasses the bundle filter on archived view
+        response = self.client.get(
+            reverse("linkding:bookmarks.archived")
+            + f"?bundle={bundle.id}&q=archived+bookmark&global_search=1"
+        )
+        self.assertContains(response, outside_bookmark.title)
+
+        # (4) Toggle flips to "Search in [bundle name]" when global_search=1
+        html = response.content.decode()
+        self.assertIn(f"Search in {bundle.name}", html)

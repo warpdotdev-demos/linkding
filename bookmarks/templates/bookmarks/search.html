@@ -76,3 +76,12 @@
     </div>
   </ld-dropdown>
 </div>
+{% if search.bundle and search.q %}
+<div class="global-search-hint">
+  {% if search.global_search %}
+    <a href="?bundle={{ search.bundle.id }}&q={{ search.q|urlencode }}">Search in {{ search.bundle.name }}</a>
+  {% else %}
+    <a href="?bundle={{ search.bundle.id }}&q={{ search.q|urlencode }}&global_search=1">Search all bookmarks</a>
+  {% endif %}
+</div>
+{% endif %}

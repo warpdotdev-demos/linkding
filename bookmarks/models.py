@@ -242,6 +242,7 @@ class BookmarkSearch:
         "sort",
         "shared",
         "unread",
+        "global_search",
         "modified_since",
         "added_since",
     ]
@@ -253,6 +254,7 @@ class BookmarkSearch:
         "sort": SORT_ADDED_DESC,
         "shared": FILTER_SHARED_OFF,
         "unread": FILTER_UNREAD_OFF,
+        "global_search": False,
         "modified_since": None,
         "added_since": None,
     }
@@ -265,6 +267,7 @@ class BookmarkSearch:
         sort: str = None,
         shared: str = None,
         unread: str = None,
+        global_search: bool = None,
         modified_since: str = None,
         added_since: str = None,
         preferences: dict = None,
@@ -281,6 +284,7 @@ class BookmarkSearch:
         self.sort = sort or self.defaults["sort"]
         self.shared = shared or self.defaults["shared"]
         self.unread = unread or self.defaults["unread"]
+        self.global_search = global_search if global_search is not None else self.defaults["global_search"]
         self.modified_since = modified_since or self.defaults["modified_since"]
         self.added_since = added_since or self.defaults["added_since"]
 
@@ -315,6 +319,8 @@ class BookmarkSearch:
             value = self.__dict__[param]
             if isinstance(value, models.Model):
                 query_params[param] = value.id
+            elif param == "global_search" and value is True:
+                query_params[param] = "1"
             else:
                 query_params[param] = value
         return query_params
@@ -335,6 +341,8 @@ class BookmarkSearch:
                     initial_values[param] = BookmarkBundle.objects.filter(
                         owner=request.user, pk=value
                     ).first()
+                elif param == "global_search":
+                    initial_values[param] = True
                 else:
                     initial_values[param] = value
 

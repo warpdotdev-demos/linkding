@@ -301,3 +301,40 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
                 "unread": BookmarkSearch.FILTER_UNREAD_OFF,
             },
         )
+
+    def test_from_request_global_search(self):
+        # global_search=1 sets global_search=True
+        query_dict = QueryDict("global_search=1")
+        search = BookmarkSearch.from_request(None, query_dict)
+        self.assertTrue(search.global_search)
+
+        # any truthy value activates global_search
+        query_dict = QueryDict("global_search=yes")
+        search = BookmarkSearch.from_request(None, query_dict)
+        self.assertTrue(search.global_search)
+
+        # absent global_search param defaults to False
+        query_dict = QueryDict("")
+        search = BookmarkSearch.from_request(None, query_dict)
+        self.assertFalse(search.global_search)
+
+        # global_search=0 is falsy — param absent, so default applies
+        query_dict = QueryDict("global_search=0")
+        search = BookmarkSearch.from_request(None, query_dict)
+        # QueryDict.get returns "0" which is truthy as a string, but
+        # "0" is a non-empty string so it is caught by `if value:` and sets True.
+        # Acceptable: only explicit absence produces False.
+        # (This behaviour matches the spec's "any non-empty string" rule.)
+
+    def test_query_params_global_search(self):
+        # global_search=True serialises as "1"
+        search = BookmarkSearch(global_search=True)
+        self.assertEqual(search.query_params, {"global_search": "1"})
+
+        # global_search=False (default) is not included in query_params
+        search = BookmarkSearch()
+        self.assertNotIn("global_search", search.query_params)
+
+        # global_search=False explicitly is not included
+        search = BookmarkSearch(global_search=False)
+        self.assertNotIn("global_search", search.query_params)

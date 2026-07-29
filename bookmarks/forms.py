@@ -269,6 +269,7 @@ class BookmarkSearchForm(forms.Form):
     sort = forms.ChoiceField(choices=SORT_CHOICES, widget=FormSelect)
     shared = forms.ChoiceField(choices=FILTER_SHARED_CHOICES, widget=forms.RadioSelect)
     unread = forms.ChoiceField(choices=FILTER_UNREAD_CHOICES, widget=forms.RadioSelect)
+    global_search = forms.BooleanField(required=False)
     modified_since = forms.CharField(required=False)
     added_since = forms.CharField(required=False)
 
