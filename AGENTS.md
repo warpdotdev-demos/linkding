@@ -63,6 +63,7 @@ Production-style frontend build (used by e2e prep): `npm run build`.
 - JS/CSS: edit `bookmarks/frontend/` and `bookmarks/styles/`; format with prettier via `make format`.
 - User-facing options and Docker env vars are documented via `.env.sample` and `docs/`; update docs when adding options.
 - Prefer small, focused PRs. Larger features should be discussed first (see README contributing note).
+- Always open PRs against `warpdotdev-demos/linkding` (this fork / `origin`). Never open PRs against the upstream `sissbruecker/linkding` repository.
 
 ## Out of scope / caution
 
