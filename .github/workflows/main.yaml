@@ -7,6 +7,30 @@ on:
       - master
 
 jobs:
+  quality:
+    name: Lint & Frontend Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Setup Python environment
+        run: uv sync
+      - name: Lint Python
+        run: uv run ruff check bookmarks
+      - name: Build frontend
+        run: npm run build
   unit_tests:
     name: Unit Tests
     runs-on: ubuntu-latest
