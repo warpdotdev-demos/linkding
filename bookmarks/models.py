@@ -443,6 +443,7 @@ class UserProfile(models.Model):
     display_edit_bookmark_action = models.BooleanField(default=True, null=False)
     display_archive_bookmark_action = models.BooleanField(default=True, null=False)
     display_remove_bookmark_action = models.BooleanField(default=True, null=False)
+    display_tag_hashtag = models.BooleanField(default=True, null=False)
     permanent_notes = models.BooleanField(default=False, null=False)
     custom_css = models.TextField(blank=True, null=False)
     custom_css_hash = models.CharField(blank=True, null=False, max_length=32)

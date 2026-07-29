@@ -337,7 +337,7 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
             self.assertEqual(len(tag_links), len(bookmark.tags.all()))
 
             for tag in bookmark.tags.all():
-                tag_link = tags.find("a", string=f"#{tag.name}")
+                tag_link = tags.find("a", string=tag.name)
                 self.assertIsNotNone(tag_link)
                 self.assertEqual(tag_link["href"], f"?q=%23{tag.name}")
 
@@ -406,7 +406,7 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
             self.assertEqual(len(tag_links), len(bookmark.tags.all()))
 
             for tag in bookmark.tags.all():
-                tag_link = tags.find("a", string=f"#{tag.name}")
+                tag_link = tags.find("a", string=tag.name)
                 self.assertIsNotNone(tag_link)
                 self.assertEqual(tag_link["href"], f"?q=%23{tag.name}")
 
@@ -470,9 +470,9 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         tags = soup.select_one(".tags")
         tag_links = tags.find_all("a")
         self.assertEqual(len(tag_links), 3)
-        self.assertEqual(tag_links[0].text, "#tag1")
-        self.assertEqual(tag_links[1].text, "#tag2")
-        self.assertEqual(tag_links[2].text, "#tag3")
+        self.assertEqual(tag_links[0].text, "tag1")
+        self.assertEqual(tag_links[1].text, "tag2")
+        self.assertEqual(tag_links[2].text, "tag3")
 
     def test_bookmark_tag_query_string(self):
         # appends tag to existing query string
@@ -1062,6 +1062,40 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         )
         self.assertNotes(html, note_html, 1)
         self.assertFaviconVisible(html, bookmark)
+
+    def test_display_tag_hashtag_default(self):
+        """Tags render without literal # in HTML when display_tag_hashtag=True (default)"""
+        tag = self.setup_tag(name="python")
+        self.setup_bookmark(tags=[tag])
+        html = self.render_template()
+        soup = self.make_soup(html)
+        tags_el = soup.select_one(".tags")
+        self.assertIsNotNone(tags_el)
+        for a in tags_el.find_all("a"):
+            self.assertFalse(
+                a.text.startswith("#"),
+                f"Tag anchor text '{a.text}' should not start with '#'",
+            )
+
+    def test_display_tag_hashtag_no_hide_class_by_default(self):
+        """When display_tag_hashtag=True (default), no hide-tag-hashtag class on body"""
+        self.setup_bookmark()
+        user = self.get_or_create_test_user()
+        self.client.force_login(user)
+        response = self.client.get(reverse("linkding:bookmarks.index"))
+        html = response.content.decode()
+        self.assertNotIn("hide-tag-hashtag", html)
+
+    def test_display_tag_hashtag_disabled(self):
+        """When display_tag_hashtag=False, body gets hide-tag-hashtag class"""
+        self.setup_bookmark()
+        user = self.get_or_create_test_user()
+        user.profile.display_tag_hashtag = False
+        user.profile.save()
+        self.client.force_login(user)
+        response = self.client.get(reverse("linkding:bookmarks.index"))
+        html = response.content.decode()
+        self.assertIn('class="hide-tag-hashtag"', html)
 
     def test_empty_state(self):
         html = self.render_template()

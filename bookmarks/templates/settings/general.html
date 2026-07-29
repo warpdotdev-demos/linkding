@@ -55,6 +55,12 @@
           {% endformhelp %}
         </div>
         <div class="form-group">
+          {% formfield form.display_tag_hashtag label="Show tag hash (#) prefix" has_help=True %}
+          {% formhelp form.display_tag_hashtag %}
+            When enabled, displays a hash (#) character before each tag. Disable to show tags without the prefix.
+          {% endformhelp %}
+        </div>
+        <div class="form-group">
           {% formfield form.permanent_notes label="Show notes permanently" has_help=True %}
           {% formhelp form.permanent_notes %}
             Whether to show bookmark notes permanently, without having to toggle them individually.
