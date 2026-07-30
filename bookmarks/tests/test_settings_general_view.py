@@ -37,6 +37,7 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
             "tag_search": UserProfile.TAG_SEARCH_STRICT,
             "tag_grouping": UserProfile.TAG_GROUPING_ALPHABETICAL,
             "display_url": False,
+            "display_tag_hashtag": True,
             "display_view_bookmark_action": True,
             "display_edit_bookmark_action": True,
             "display_archive_bookmark_action": True,
@@ -600,6 +601,28 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
         self.assertSuccessMessage(
             response.content.decode(), "Global settings updated", count=0
         )
+
+    def test_update_profile_display_tag_hashtag(self):
+        """Settings form saves display_tag_hashtag and it can be toggled"""
+        # Disable the toggle
+        form_data = self.create_profile_form_data({"display_tag_hashtag": False})
+        form_data["update_profile"] = ""
+        response = self.client.post(
+            reverse("linkding:settings.update"), form_data, follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.user.profile.refresh_from_db()
+        self.assertFalse(self.user.profile.display_tag_hashtag)
+
+        # Re-enable the toggle
+        form_data = self.create_profile_form_data({"display_tag_hashtag": True})
+        form_data["update_profile"] = ""
+        response = self.client.post(
+            reverse("linkding:settings.update"), form_data, follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.user.profile.refresh_from_db()
+        self.assertTrue(self.user.profile.display_tag_hashtag)
 
     def test_update_global_settings_checks_for_superuser(self):
         form_data = {

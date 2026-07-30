@@ -448,10 +448,33 @@ class BookmarkDetailsModalTestCase(TestCase, BookmarkFactoryMixin, HtmlTestMixin
         section = self.get_section_content(soup, "Tags")
 
         for tag in bookmark.tags.all():
-            tag_link = section.find("a", string=f"#{tag.name}")
+            tag_link = section.find("a", string=tag.name)
             self.assertIsNotNone(tag_link)
             expected_url = reverse("linkding:bookmarks.index") + f"?q=%23{tag.name}"
             self.assertEqual(tag_link["href"], expected_url)
+
+    def test_display_tag_hashtag_default_details_modal(self):
+        """Tags in details modal render without literal # in HTML (default: display_tag_hashtag=True)"""
+        tag = self.setup_tag(name="python")
+        bookmark = self.setup_bookmark(tags=[tag])
+        soup = self.get_index_details_modal(bookmark)
+        section = self.get_section_content(soup, "Tags")
+        for a in section.find_all("a"):
+            self.assertFalse(
+                a.text.startswith("#"),
+                f"Tag anchor text '{a.text}' should not start with '#'",
+            )
+
+    def test_display_tag_hashtag_disabled_details_modal(self):
+        """When display_tag_hashtag=False, body gets hide-tag-hashtag class on details page"""
+        profile = self.get_or_create_test_user().profile
+        profile.display_tag_hashtag = False
+        profile.save()
+        bookmark = self.setup_bookmark()
+        url = reverse("linkding:bookmarks.index") + f"?details={bookmark.id}"
+        response = self.client.get(url)
+        html = response.content.decode()
+        self.assertIn('class="hide-tag-hashtag"', html)
 
     def test_description(self):
         # without description
