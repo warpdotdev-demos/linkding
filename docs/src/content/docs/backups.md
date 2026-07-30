@@ -102,8 +102,10 @@ This is the least technical option to back up bookmarks, but has several limitat
 Only use this method if you are fine with the above limitations.
 
 To export bookmarks from the UI, open the general settings.
-In the Export section, click on the *Download* button to download an HTML file containing all your bookmarks.
+In the Export section, click *Download (.html)* for a Netscape HTML file, or *Download (.csv)* for a CSV file containing all your bookmarks.
 Then move that file to your backup location.
+
+CSV export includes URL, title, description, tags, date added, and archived/unread/shared flags. Import currently supports Netscape HTML only.
 
 To restore bookmarks, open the general settings on your new installation.
 In the Import section, click on the *Choose file* button to select the HTML file you downloaded before.

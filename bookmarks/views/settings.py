@@ -281,13 +281,21 @@ def bookmark_export(request: HttpRequest):
         bookmarks = Bookmark.objects.filter(owner=request.user)
         # Prefetch tags to prevent n+1 queries
         prefetch_related_objects(bookmarks, "tags")
-        file_content = exporter.export_netscape_html(list(bookmarks))
+        bookmark_list = list(bookmarks)
 
-        # Generate filename with current date and time
+        export_format = request.GET.get("format", "html").lower()
         current_time = timezone.now()
-        filename = current_time.strftime("bookmarks_%Y-%m-%d_%H-%M-%S.html")
 
-        response = HttpResponse(content_type="text/plain; charset=UTF-8")
+        if export_format == "csv":
+            file_content = exporter.export_csv(bookmark_list)
+            content_type = "text/csv; charset=UTF-8"
+            filename = current_time.strftime("bookmarks_%Y-%m-%d_%H-%M-%S.csv")
+        else:
+            file_content = exporter.export_netscape_html(bookmark_list)
+            content_type = "text/plain; charset=UTF-8"
+            filename = current_time.strftime("bookmarks_%Y-%m-%d_%H-%M-%S.html")
+
+        response = HttpResponse(content_type=content_type)
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         response.write(file_content)
 

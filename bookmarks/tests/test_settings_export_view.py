@@ -88,3 +88,80 @@ class SettingsExportViewTestCase(TestCase, BookmarkFactoryMixin):
         self.assertEqual(response.status_code, 200)
         expected_filename = 'attachment; filename="bookmarks_2023-05-15_14-30-45.html"'
         self.assertEqual(response["Content-Disposition"], expected_filename)
+
+    def test_should_export_csv_successfully(self):
+        self.setup_bookmark(tags=[self.setup_tag()])
+        self.setup_bookmark(tags=[self.setup_tag()], is_archived=True)
+
+        response = self.client.get(
+            reverse("linkding:settings.export") + "?format=csv", follow=True
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["content-type"], "text/csv; charset=UTF-8")
+
+        text = response.content.decode("utf-8")
+        self.assertIn(
+            "URL,Title,Description,Tags,Date added,Archived,Unread,Shared",
+            text,
+        )
+        for bookmark in Bookmark.objects.all():
+            self.assertIn(bookmark.url, text)
+
+    def test_should_only_export_user_bookmarks_as_csv(self):
+        other_user = self.setup_user()
+        owned_bookmarks = [
+            self.setup_bookmark(tags=[self.setup_tag()]),
+            self.setup_bookmark(tags=[self.setup_tag()]),
+        ]
+        non_owned_bookmarks = [
+            self.setup_bookmark(tags=[self.setup_tag()], user=other_user),
+            self.setup_bookmark(tags=[self.setup_tag()], user=other_user),
+        ]
+
+        response = self.client.get(
+            reverse("linkding:settings.export") + "?format=csv", follow=True
+        )
+
+        text = response.content.decode("utf-8")
+
+        for bookmark in owned_bookmarks:
+            self.assertIn(bookmark.url, text)
+
+        for bookmark in non_owned_bookmarks:
+            self.assertNotIn(bookmark.url, text)
+
+    def test_should_show_hint_when_csv_export_raises_error(self):
+        with patch("bookmarks.services.exporter.export_csv") as mock_export_csv:
+            mock_export_csv.side_effect = Exception("Nope")
+            response = self.client.get(
+                reverse("linkding:settings.export") + "?format=csv", follow=True
+            )
+
+            self.assertTemplateUsed(response, "settings/general.html")
+            self.assertFormErrorHint(
+                response, "An error occurred during bookmark export."
+            )
+
+    def test_csv_filename_includes_date_and_time(self):
+        self.setup_bookmark()
+
+        fixed_time = datetime.datetime(2023, 5, 15, 14, 30, 45, tzinfo=datetime.UTC)
+
+        with patch("bookmarks.views.settings.timezone.now", return_value=fixed_time):
+            response = self.client.get(
+                reverse("linkding:settings.export") + "?format=csv", follow=True
+            )
+
+        self.assertEqual(response.status_code, 200)
+        expected_filename = 'attachment; filename="bookmarks_2023-05-15_14-30-45.csv"'
+        self.assertEqual(response["Content-Disposition"], expected_filename)
+
+    def test_export_page_includes_csv_download_button(self):
+        response = self.client.get(reverse("linkding:settings.general"))
+
+        self.assertContains(response, "Download (.html)")
+        self.assertContains(response, "Download (.csv)")
+        self.assertContains(
+            response, reverse("linkding:settings.export") + "?format=csv"
+        )

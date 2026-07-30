@@ -1,3 +1,5 @@
+import csv
+import io
 from datetime import UTC, datetime
 
 from django.test import TestCase
@@ -114,3 +116,154 @@ class ExporterTestCase(TestCase, BookmarkFactoryMixin):
         bookmark.description = ""
         bookmark.save()
         exporter.export_netscape_html([bookmark])
+
+    def test_export_csv_bookmarks(self):
+        bookmarks = [
+            self.setup_bookmark(
+                url="https://example.com/1",
+                title="Title 1",
+                added=datetime.fromtimestamp(1, UTC),
+                description="Example description",
+            ),
+            self.setup_bookmark(
+                url="https://example.com/2",
+                title="Title 2",
+                added=datetime.fromtimestamp(2, UTC),
+                tags=[
+                    self.setup_tag(name="tag1"),
+                    self.setup_tag(name="tag2"),
+                    self.setup_tag(name="tag3"),
+                ],
+            ),
+            self.setup_bookmark(
+                url="https://example.com/3",
+                title="Title 3",
+                added=datetime.fromtimestamp(3, UTC),
+                unread=True,
+            ),
+            self.setup_bookmark(
+                url="https://example.com/4",
+                title="Title 4",
+                added=datetime.fromtimestamp(4, UTC),
+                shared=True,
+            ),
+            self.setup_bookmark(
+                url="https://example.com/5",
+                title="Title 5",
+                added=datetime.fromtimestamp(5, UTC),
+                is_archived=True,
+                tags=[self.setup_tag(name="tag4"), self.setup_tag(name="tag5")],
+            ),
+            self.setup_bookmark(
+                url="https://example.com/6",
+                title="",
+                added=datetime.fromtimestamp(6, UTC),
+                description="",
+            ),
+        ]
+        # Ensure empty title stays empty (not resolved to URL)
+        bookmarks[5].title = ""
+        bookmarks[5].save()
+
+        csv_text = exporter.export_csv(bookmarks)
+        rows = list(csv.reader(io.StringIO(csv_text)))
+
+        self.assertEqual(rows[0], exporter.CSV_HEADERS)
+        self.assertEqual(
+            rows[1],
+            [
+                "https://example.com/1",
+                "Title 1",
+                "Example description",
+                "",
+                "1970-01-01T00:00:01Z",
+                "false",
+                "false",
+                "false",
+            ],
+        )
+        self.assertEqual(
+            rows[2],
+            [
+                "https://example.com/2",
+                "Title 2",
+                "",
+                "tag1,tag2,tag3",
+                "1970-01-01T00:00:02Z",
+                "false",
+                "false",
+                "false",
+            ],
+        )
+        self.assertEqual(
+            rows[3],
+            [
+                "https://example.com/3",
+                "Title 3",
+                "",
+                "",
+                "1970-01-01T00:00:03Z",
+                "false",
+                "true",
+                "false",
+            ],
+        )
+        self.assertEqual(
+            rows[4],
+            [
+                "https://example.com/4",
+                "Title 4",
+                "",
+                "",
+                "1970-01-01T00:00:04Z",
+                "false",
+                "false",
+                "true",
+            ],
+        )
+        self.assertEqual(
+            rows[5],
+            [
+                "https://example.com/5",
+                "Title 5",
+                "",
+                "tag4,tag5",
+                "1970-01-01T00:00:05Z",
+                "true",
+                "false",
+                "false",
+            ],
+        )
+        self.assertEqual(
+            rows[6],
+            [
+                "https://example.com/6",
+                "",
+                "",
+                "",
+                "1970-01-01T00:00:06Z",
+                "false",
+                "false",
+                "false",
+            ],
+        )
+        self.assertEqual(len(rows), 7)
+
+    def test_export_csv_quotes_special_characters(self):
+        bookmark = self.setup_bookmark(
+            url="https://example.com/quoted",
+            title='Title, with "quotes"',
+            description="Line1\nLine2",
+            tags=[self.setup_tag(name="a,b"), self.setup_tag(name="c")],
+            added=datetime.fromtimestamp(10, UTC),
+        )
+
+        csv_text = exporter.export_csv([bookmark])
+        rows = list(csv.reader(io.StringIO(csv_text)))
+
+        self.assertEqual(rows[0], exporter.CSV_HEADERS)
+        self.assertEqual(rows[1][0], "https://example.com/quoted")
+        self.assertEqual(rows[1][1], 'Title, with "quotes"')
+        self.assertEqual(rows[1][2], "Line1\nLine2")
+        self.assertEqual(rows[1][3], "a,b,c")
+        self.assertIn('"Title, with ""quotes"""', csv_text)

@@ -1,8 +1,21 @@
+import csv
 import html
+import io
 
 from bookmarks.models import Bookmark
 
 BookmarkDocument = list[str]
+
+CSV_HEADERS = [
+    "URL",
+    "Title",
+    "Description",
+    "Tags",
+    "Date added",
+    "Archived",
+    "Unread",
+    "Shared",
+]
 
 
 def export_netscape_html(bookmarks: list[Bookmark]):
@@ -51,3 +64,33 @@ def append_bookmark(doc: BookmarkDocument, bookmark: Bookmark):
 
 def append_list_end(doc: BookmarkDocument):
     doc.append("</DL><p>")
+
+
+def _format_bool(value: bool) -> str:
+    return "true" if value else "false"
+
+
+def _format_csv_date(value) -> str:
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def export_csv(bookmarks: list[Bookmark]) -> str:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(CSV_HEADERS)
+
+    for bookmark in bookmarks:
+        writer.writerow(
+            [
+                bookmark.url,
+                bookmark.title,
+                bookmark.description,
+                ",".join(bookmark.tag_names),
+                _format_csv_date(bookmark.date_added),
+                _format_bool(bookmark.is_archived),
+                _format_bool(bookmark.unread),
+                _format_bool(bookmark.shared),
+            ]
+        )
+
+    return buffer.getvalue()

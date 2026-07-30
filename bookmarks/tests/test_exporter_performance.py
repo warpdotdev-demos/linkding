@@ -29,3 +29,18 @@ class ExporterPerformanceTestCase(TestCase, BookmarkFactoryMixin):
         number_of_queries = context.final_queries
 
         self.assertLess(number_of_queries, num_initial_bookmarks)
+
+    def test_export_csv_max_queries(self):
+        num_initial_bookmarks = 10
+        for _i in range(num_initial_bookmarks):
+            self.setup_bookmark(tags=[self.setup_tag()])
+
+        context = CaptureQueriesContext(self.get_connection())
+        with context:
+            self.client.get(
+                reverse("linkding:settings.export") + "?format=csv", follow=True
+            )
+
+        number_of_queries = context.final_queries
+
+        self.assertLess(number_of_queries, num_initial_bookmarks)
