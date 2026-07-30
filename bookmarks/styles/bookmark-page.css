@@ -269,6 +269,13 @@ ul.bookmark-list {
       & a:not(:last-child) {
         margin-right: var(--unit-1);
       }
+      & a::before {
+        content: "#";
+      }
+    }
+
+    .hide-tag-hashtag & .tags a::before {
+      content: none;
     }
 
     & .actions,

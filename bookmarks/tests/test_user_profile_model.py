@@ -14,3 +14,8 @@ class UserProfileTestCase(TestCase):
         user = User.objects.create_user("testuser", "test@example.com", "password123")
         profile = UserProfile.objects.all().filter(user_id=user.id).first()
         self.assertFalse(profile.enable_sharing)
+
+    def test_display_tag_hashtag_is_enabled_by_default(self):
+        user = User.objects.create_user("testuser2", "test2@example.com", "password123")
+        profile = UserProfile.objects.all().filter(user_id=user.id).first()
+        self.assertTrue(profile.display_tag_hashtag)

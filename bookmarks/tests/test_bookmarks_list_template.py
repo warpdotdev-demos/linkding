@@ -337,7 +337,7 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
             self.assertEqual(len(tag_links), len(bookmark.tags.all()))
 
             for tag in bookmark.tags.all():
-                tag_link = tags.find("a", string=f"#{tag.name}")
+                tag_link = tags.find("a", string=tag.name)
                 self.assertIsNotNone(tag_link)
                 self.assertEqual(tag_link["href"], f"?q=%23{tag.name}")
 
@@ -406,7 +406,7 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
             self.assertEqual(len(tag_links), len(bookmark.tags.all()))
 
             for tag in bookmark.tags.all():
-                tag_link = tags.find("a", string=f"#{tag.name}")
+                tag_link = tags.find("a", string=tag.name)
                 self.assertIsNotNone(tag_link)
                 self.assertEqual(tag_link["href"], f"?q=%23{tag.name}")
 
@@ -470,9 +470,9 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         tags = soup.select_one(".tags")
         tag_links = tags.find_all("a")
         self.assertEqual(len(tag_links), 3)
-        self.assertEqual(tag_links[0].text, "#tag1")
-        self.assertEqual(tag_links[1].text, "#tag2")
-        self.assertEqual(tag_links[2].text, "#tag3")
+        self.assertEqual(tag_links[0].text, "tag1")
+        self.assertEqual(tag_links[1].text, "tag2")
+        self.assertEqual(tag_links[2].text, "tag3")
 
     def test_bookmark_tag_query_string(self):
         # appends tag to existing query string
@@ -1149,3 +1149,16 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
 
         # But date should still be rendered
         self.assertWebArchiveLink(html, "1 week ago", bookmark.web_archive_snapshot_url)
+
+    def test_tag_links_have_no_hash_prefix_in_html(self):
+        tag = self.setup_tag(name="testtag")
+        self.setup_bookmark(tags=[tag])
+        html = self.render_template()
+        soup = self.make_soup(html)
+        tags = soup.select_one(".tags")
+        self.assertIsNotNone(tags)
+        tag_link = tags.find("a", string="testtag")
+        self.assertIsNotNone(tag_link, "Tag anchor should contain only the name without '#'")
+        # Confirm # is not present in the HTML text of the anchor
+        tag_link_with_hash = tags.find("a", string="#testtag")
+        self.assertIsNone(tag_link_with_hash, "Tag anchor should not contain '#' in HTML text")

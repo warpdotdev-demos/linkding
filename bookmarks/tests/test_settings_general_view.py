@@ -37,6 +37,7 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
             "tag_search": UserProfile.TAG_SEARCH_STRICT,
             "tag_grouping": UserProfile.TAG_GROUPING_ALPHABETICAL,
             "display_url": False,
+            "display_tag_hashtag": True,
             "display_view_bookmark_action": True,
             "display_edit_bookmark_action": True,
             "display_archive_bookmark_action": True,
@@ -109,6 +110,7 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
             "tag_search": UserProfile.TAG_SEARCH_LAX,
             "tag_grouping": UserProfile.TAG_GROUPING_DISABLED,
             "display_url": True,
+            "display_tag_hashtag": False,
             "display_view_bookmark_action": False,
             "display_edit_bookmark_action": False,
             "display_archive_bookmark_action": False,
@@ -168,6 +170,9 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
         self.assertEqual(self.user.profile.tag_search, form_data["tag_search"])
         self.assertEqual(self.user.profile.tag_grouping, form_data["tag_grouping"])
         self.assertEqual(self.user.profile.display_url, form_data["display_url"])
+        self.assertEqual(
+            self.user.profile.display_tag_hashtag, form_data["display_tag_hashtag"]
+        )
         self.assertEqual(
             self.user.profile.display_view_bookmark_action,
             form_data["display_view_bookmark_action"],
