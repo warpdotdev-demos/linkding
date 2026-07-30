@@ -89,6 +89,17 @@ make serve
 ```
 The frontend is now available under http://localhost:8000
 
+### Running dev processes in the background
+
+`make serve`, `make frontend` and `make tasks` run in the foreground and never exit, which is inconvenient in scripts, CI, and coding agent sessions. Each has a background variant that starts the process detached and returns as soon as it is up:
+```
+make serve-bg       # start the dev server, waits until http://127.0.0.1:8000 answers
+make serve-logs     # tail the server log
+make serve-status   # check whether it is running
+make serve-stop     # stop it again
+```
+The same `-bg` / `-logs` / `-stop` targets exist for `frontend` and `tasks`. Use `make serve-bg PORT=8001` to run on a different port. Logs and PID files are written to `tmp/` (gitignored); the shared helper is `scripts/dev-process.sh`.
+
 ### Tests
 
 Run all tests with pytest:

@@ -37,9 +37,9 @@ Run these from the repo root. Always use `make` targets when one exists; use `uv
 
 | Task | Command |
 |------|---------|
-| Django dev server | `make serve` → http://localhost:8000 |
-| Frontend watch build | `make frontend` (`npm run dev`) |
-| Background tasks (Huey) | `make tasks` |
+| Django dev server | `make serve-bg` → http://127.0.0.1:8000 (see below) |
+| Frontend watch build | `make frontend-bg` (`npm run dev`) |
+| Background tasks (Huey) | `make tasks-bg` (`manage.py run_huey`) |
 | Unit/integration tests | `make test` (`pytest -n auto`) |
 | Lint (Python) | `make lint` (`ruff check bookmarks`) |
 | Format | `make format` (ruff + djlint + prettier) |
@@ -47,6 +47,22 @@ Run these from the repo root. Always use `make` targets when one exists; use `uv
 | One-off management | `uv run manage.py <cmd>` |
 
 Production-style frontend build (used by e2e prep): `npm run build`.
+
+## Long-running processes
+
+The dev server, the Huey worker and the frontend watcher never exit on their own. **Do not run `make serve`, `make tasks` or `make frontend` directly** — they block the shell forever and will stall a non-interactive session. Use the `-bg` variants, which start the process detached and return as soon as it is up:
+
+| Task | Start | Stop | Logs |
+|------|-------|------|------|
+| Dev server | `make serve-bg` | `make serve-stop` | `make serve-logs` (also `make serve-status`) |
+| Huey worker | `make tasks-bg` | `make tasks-stop` | `make tasks-logs` |
+| Frontend watcher | `make frontend-bg` | `make frontend-stop` | `make frontend-logs` |
+
+- `make serve-bg` polls `http://127.0.0.1:8000/` and only returns once the server answers, so the next command can hit it immediately. A non-zero exit means startup failed; the tail of the log is printed for you.
+- Override host/port when 8000 is taken (e.g. parallel agents on one machine): `make serve-bg PORT=8001`. All targets are idempotent — starting an already-running process is a no-op.
+- State lives in `tmp/<name>.pid` and `tmp/<name>.log` (gitignored). The underlying helper is `scripts/dev-process.sh`.
+- **Always stop what you started** (`make serve-stop`) before finishing, or the port stays occupied for the next session.
+- Prefer tests over a manual server: `bookmarks/tests_e2e/` uses `LiveServerTestCase` (`bookmarks/tests_e2e/helpers.py:14`), which starts and tears down its own server, so `make e2e` needs no running server. Reach for `make serve-bg` only for manual browser / computer-use verification.
 
 ## Testing guidance
 
