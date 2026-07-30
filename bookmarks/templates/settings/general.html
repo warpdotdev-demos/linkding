@@ -319,10 +319,15 @@ reddit.com/r/Music music reddit</pre>
     {# Export section #}
     <section aria-labelledby="export-heading">
       <h2 id="export-heading">Export</h2>
-      <p>Export all bookmarks in Netscape HTML format.</p>
-      <a class="btn btn-primary"
-         target="_blank"
-         href="{% url 'linkding:settings.export' %}">Download (.html)</a>
+      <p>Export all bookmarks as Netscape HTML or CSV.</p>
+      <div class="d-flex gap-2">
+        <a class="btn btn-primary"
+           target="_blank"
+           href="{% url 'linkding:settings.export' %}">Download (.html)</a>
+        <a class="btn btn-primary"
+           target="_blank"
+           href="{% url 'linkding:settings.export' %}?format=csv">Download (.csv)</a>
+      </div>
       {% if export_error %}
         <div class="has-error">
           <p class="form-input-hint">{{ export_error }}</p>
