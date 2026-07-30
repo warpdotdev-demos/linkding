@@ -5,7 +5,7 @@
   {% block head %}
     {% include 'shared/head.html' %}
   {% endblock %}
-  <body>
+  <body{% if request.user.is_authenticated and not request.user_profile.display_tag_hashtag %} class="hide-tag-hashtag"{% endif %}>
     <header class="container">
       {% if has_toasts %}
         <div class="message-list">

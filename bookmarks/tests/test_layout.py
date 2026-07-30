@@ -97,6 +97,33 @@ class LayoutTestCase(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         link = soup.select_one("link[rel='stylesheet'][href*='custom_css']")
         self.assertIsNotNone(link)
 
+    def test_body_has_no_hide_tag_hashtag_class_by_default(self):
+        response = self.client.get(reverse("linkding:bookmarks.index"))
+        html = response.content.decode()
+        soup = self.make_soup(html)
+        body = soup.find("body")
+        self.assertNotIn("hide-tag-hashtag", body.get("class", []))
+
+    def test_body_has_hide_tag_hashtag_class_when_display_tag_hashtag_disabled(self):
+        profile = self.get_or_create_test_user().profile
+        profile.display_tag_hashtag = False
+        profile.save()
+        response = self.client.get(reverse("linkding:bookmarks.index"))
+        html = response.content.decode()
+        soup = self.make_soup(html)
+        body = soup.find("body")
+        self.assertIn("hide-tag-hashtag", body.get("class", []))
+
+    def test_body_has_no_hide_tag_hashtag_class_when_display_tag_hashtag_enabled(self):
+        profile = self.get_or_create_test_user().profile
+        profile.display_tag_hashtag = True
+        profile.save()
+        response = self.client.get(reverse("linkding:bookmarks.index"))
+        html = response.content.decode()
+        soup = self.make_soup(html)
+        body = soup.find("body")
+        self.assertNotIn("hide-tag-hashtag", body.get("class", []))
+
     def test_custom_css_link_href(self):
         profile = self.get_or_create_test_user().profile
         profile.custom_css = "body { background-color: red; }"
