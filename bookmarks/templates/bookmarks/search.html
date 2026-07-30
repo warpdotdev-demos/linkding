@@ -13,6 +13,9 @@
     <input type="submit" value="Search" class="d-none">
     {% for hidden_field in search_form.hidden_fields %}{{ hidden_field }}{% endfor %}
   </form>
+  {% if global_search_url %}
+    <a href="{{ global_search_url }}" class="search-all-link">Search all bookmarks</a>
+  {% endif %}
   <ld-dropdown class="search-options dropdown dropdown-right">
     <button type="button"
             aria-label="Search preferences"

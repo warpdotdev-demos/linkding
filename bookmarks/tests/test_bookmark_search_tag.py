@@ -207,6 +207,45 @@ class BookmarkSearchTagTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
 
         self.assertNotIn("badge", button["class"])
 
+    def test_global_search_link_with_bundle_and_query(self):
+        bundle = self.setup_bundle()
+        url = f"/test?bundle={bundle.pk}&q=foo"
+        rendered_template = self.render_template(url)
+        soup = self.make_soup(rendered_template)
+        link = soup.select_one("a.search-all-link")
+        self.assertIsNotNone(link)
+        href = link["href"]
+        self.assertIn("q=foo", href)
+        self.assertNotIn("bundle=", href)
+
+    def test_global_search_link_preserves_other_params(self):
+        bundle = self.setup_bundle()
+        url = f"/test?bundle={bundle.pk}&q=foo&sort=title_asc"
+        rendered_template = self.render_template(url)
+        soup = self.make_soup(rendered_template)
+        link = soup.select_one("a.search-all-link")
+        self.assertIsNotNone(link)
+        href = link["href"]
+        self.assertIn("q=foo", href)
+        self.assertIn("sort=title_asc", href)
+        self.assertNotIn("bundle=", href)
+        self.assertNotIn("page=", href)
+
+    def test_global_search_link_hidden_without_query(self):
+        bundle = self.setup_bundle()
+        url = f"/test?bundle={bundle.pk}"
+        rendered_template = self.render_template(url)
+        soup = self.make_soup(rendered_template)
+        link = soup.select_one("a.search-all-link")
+        self.assertIsNone(link)
+
+    def test_global_search_link_hidden_without_bundle(self):
+        url = "/test?q=foo"
+        rendered_template = self.render_template(url)
+        soup = self.make_soup(rendered_template)
+        link = soup.select_one("a.search-all-link")
+        self.assertIsNone(link)
+
     def test_modified_labels(self):
         # Without modifications
         url = "/test"
