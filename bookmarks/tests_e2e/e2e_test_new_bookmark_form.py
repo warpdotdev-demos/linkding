@@ -126,6 +126,13 @@ class BookmarkFormE2ETestCase(LinkdingE2ETestCase):
             state="hidden", timeout=2000
         )
 
+    def test_notes_should_be_expanded_by_default(self):
+        page = self.open(reverse("linkding:bookmarks.new"))
+
+        details = page.locator("details.notes")
+        expect(details).to_have_attribute("open", value="")
+        expect(page.get_by_label("Notes")).to_be_visible()
+
     def test_enter_url_of_existing_bookmark_should_show_notes(self):
         bookmark = self.setup_bookmark(
             notes="Existing notes", description="Existing description"
@@ -133,11 +140,15 @@ class BookmarkFormE2ETestCase(LinkdingE2ETestCase):
 
         page = self.open(reverse("linkding:bookmarks.new"))
 
+        # Collapse the notes, they should be expanded again once the notes of
+        # the existing bookmark are prefilled
         details = page.locator("details.notes")
+        details.locator("summary").click()
         expect(details).not_to_have_attribute("open", value="")
 
         page.get_by_label("URL").fill(bookmark.url)
         expect(details).to_have_attribute("open", value="")
+        expect(page.get_by_label("Notes")).to_have_value("Existing notes")
 
     def test_create_should_preview_auto_tags(self):
         profile = self.get_or_create_test_user().profile
