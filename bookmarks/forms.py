@@ -88,6 +88,12 @@ class BookmarkForm(forms.ModelForm):
             self.instance and self.instance.notes
         )
 
+    @property
+    def is_notes_expanded(self):
+        # Expand notes by default when creating a new bookmark, and when
+        # editing a bookmark that already has notes
+        return not self.instance.pk or bool(self.has_notes)
+
     def save(self, commit=False):
         tag_string = convert_tag_string(self.data["tag_string"])
         bookmark = super().save(commit=False)

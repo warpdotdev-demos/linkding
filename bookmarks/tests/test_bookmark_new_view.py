@@ -147,6 +147,11 @@ class BookmarkNewViewTestCase(TestCase, BookmarkFactoryMixin):
             html,
         )
 
+    def test_should_expand_notes_by_default(self):
+        response = self.client.get(reverse("linkding:bookmarks.new"))
+
+        self.assertContains(response, '<details class="notes" open>', count=1)
+
     def test_should_enable_auto_close_when_specified_in_url_parameter(self):
         response = self.client.get(reverse("linkding:bookmarks.new") + "?auto_close")
         html = response.content.decode()
