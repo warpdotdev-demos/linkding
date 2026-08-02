@@ -70,13 +70,13 @@ class BookmarkDetailsModalE2ETestCase(LinkdingE2ETestCase):
 
         details_modal.get_by_text("Unread").click()
         bookmark_item = self.locate_bookmark(bookmark.title)
-        expect(bookmark_item.get_by_text("Unread")).to_be_visible()
+        expect(bookmark_item.locator(".unread-badge")).to_be_visible()
         self.assertReloads(0)
 
         # mark as read
         details_modal.get_by_text("Unread").click()
         bookmark_item = self.locate_bookmark(bookmark.title)
-        expect(bookmark_item.get_by_text("Unread")).not_to_be_visible()
+        expect(bookmark_item.locator(".unread-badge")).not_to_be_visible()
         self.assertReloads(0)
 
     def test_toggle_shared(self):

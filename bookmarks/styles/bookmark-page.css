@@ -239,8 +239,30 @@ ul.bookmark-list {
       }
     }
 
+    &.unread .title {
+      display: flex;
+      align-items: center;
+      gap: var(--unit-2);
+    }
+
     &.unread .title a {
+      flex: 0 1 auto;
+      width: auto;
+      min-width: 0;
       font-style: italic;
+    }
+
+    & .title .unread-badge {
+      flex: 0 0 auto;
+      padding: 0 var(--unit-1);
+      border-radius: var(--border-radius);
+      background: var(--primary-color);
+      color: var(--contrast-text-color);
+      font-size: var(--font-size-sm);
+      font-style: normal;
+      font-weight: 500;
+      line-height: var(--line-height);
+      white-space: nowrap;
     }
 
     & .url-path,

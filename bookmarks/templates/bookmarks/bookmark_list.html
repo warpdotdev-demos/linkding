@@ -28,6 +28,7 @@
                  rel="noopener">
                 <span>{{ bookmark_item.title }}</span>
               </a>
+              {% if bookmark_item.unread %}<span class="unread-badge">Unread</span>{% endif %}
             </div>
             {% if bookmark_list.show_url %}
               <div class="url-path truncate">
