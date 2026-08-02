@@ -130,7 +130,7 @@ class BookmarkPagePartialUpdatesE2ETestCase(LinkdingE2ETestCase):
         self.open(reverse("linkding:bookmarks.index"))
 
         expect(self.locate_bookmark("Bookmark 2")).to_have_class("unread")
-        self.locate_bookmark("Bookmark 2").get_by_text("Unread").click()
+        self.locate_bookmark("Bookmark 2").get_by_role("button", name="Unread").click()
         self.locate_confirm_dialog().get_by_text("Confirm").click()
 
         expect(self.locate_bookmark("Bookmark 2")).not_to_have_class("unread")
