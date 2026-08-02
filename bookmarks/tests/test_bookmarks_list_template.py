@@ -1,4 +1,5 @@
 import datetime
+from urllib.parse import parse_qs
 
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse
@@ -9,6 +10,7 @@ from django.utils import formats, timezone
 
 from bookmarks.middlewares import LinkdingMiddleware
 from bookmarks.models import Bookmark, BookmarkSearch, User, UserProfile
+from bookmarks.services.search_query_parser import TagExpression, parse_search_query
 from bookmarks.tests.helpers import BookmarkFactoryMixin, HtmlTestMixin
 from bookmarks.utils import app_version
 from bookmarks.views import contexts
@@ -494,6 +496,27 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         tag_links = tags.find_all("a")
         self.assertEqual(len(tag_links), 1)
         self.assertEqual(tag_links[0]["href"], "?q=%28term1+or+term2%29+%23tag1")
+
+    def test_bookmark_tag_query_string_with_parentheses_in_name(self):
+        bookmark = self.setup_bookmark(title="Paren tagged bookmark")
+        paren_tag = self.setup_tag(name="hello(world)")
+        bookmark.tags.add(paren_tag)
+
+        html = self.render_template()
+        soup = self.make_soup(html)
+        tags = soup.select_one(".tags")
+        tag_links = tags.find_all("a")
+        self.assertEqual(len(tag_links), 1)
+        # Special-character tag names are emitted as quoted tags so the chip
+        # link round-trips through the search tokenizer.
+        self.assertEqual(tag_links[0]["href"], '?q=%23%22hello%28world%29%22')
+
+        # Clicking the chip must resolve back to the same tag
+        href = tag_links[0]["href"]
+        q = parse_qs(href.lstrip("?"))["q"][0]
+        expr = parse_search_query(q)
+        self.assertIsInstance(expr, TagExpression)
+        self.assertEqual(expr.tag, "hello(world)")
 
     def test_should_render_web_archive_link_with_absolute_date_setting(self):
         bookmark = self.setup_date_format_test(

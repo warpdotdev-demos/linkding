@@ -234,6 +234,43 @@ class QueriesBasicTestCase(TestCase, BookmarkFactoryMixin):
 
         self.assertQueryResult(query, [self.tag1_tag2_bookmarks])
 
+    def test_query_bookmarks_should_search_tag_with_parentheses_in_name(self):
+        paren_tag = self.setup_tag(name="hello(world)")
+        plain_tag = self.setup_tag(name="hello")
+        paren_tag_bookmarks = [self.setup_bookmark(tags=[paren_tag])]
+        plain_tag_bookmarks = [self.setup_bookmark(tags=[plain_tag])]
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#hello(world)")
+        )
+        self.assertQueryResult(query, [paren_tag_bookmarks])
+
+        # Quoted form is an explicit escape hatch in the advanced parser only
+        if not self.profile.legacy_search:
+            query = queries.query_bookmarks(
+                self.user, self.profile, BookmarkSearch(q='#"hello(world)"')
+            )
+            self.assertQueryResult(query, [paren_tag_bookmarks])
+
+        # Tag names are still matched exactly, ignoring casing
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#HELLO(WORLD)")
+        )
+        self.assertQueryResult(query, [paren_tag_bookmarks])
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#hello")
+        )
+        self.assertQueryResult(query, [plain_tag_bookmarks])
+
+        # Lax mode treats the bare term as a tag name too
+        self.profile.tag_search = UserProfile.TAG_SEARCH_LAX
+        self.profile.save()
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="hello(world)")
+        )
+        self.assertQueryResult(query, [paren_tag_bookmarks])
+
     def test_query_bookmarks_should_search_terms_and_tags_combined(self):
         self.setup_bookmark_search_data()
 
@@ -1748,6 +1785,52 @@ class QueriesAdvancedSearchTestCase(TestCase, BookmarkFactoryMixin):
         self.assertCountEqual(
             list(query), [self.python_bookmark, self.javascript_tutorial]
         )
+
+    def test_tag_with_parentheses_in_name(self):
+        paren_bookmark = self.setup_bookmark(
+            title="Paren Tag Bookmark",
+            tags=[self.setup_tag(name="hello(world)")],
+        )
+
+        # Searching the parenthesized tag returns the bookmark
+        search = BookmarkSearch(q="#hello(world)")
+        query = queries.query_bookmarks(self.user, self.profile, search)
+        self.assertCountEqual(list(query), [paren_bookmark])
+
+        # Normal tag search is unaffected
+        search = BookmarkSearch(q="#tutorial")
+        query = queries.query_bookmarks(self.user, self.profile, search)
+        self.assertCountEqual(
+            list(query), [self.python_bookmark, self.javascript_tutorial]
+        )
+
+    def test_tag_with_parentheses_in_name_in_boolean_query(self):
+        paren_bookmark = self.setup_bookmark(
+            title="Paren Tag Bookmark",
+            tags=[self.setup_tag(name="hello(world)")],
+        )
+
+        # Grouped OR combining a parenthesized tag with a regular tag
+        search = BookmarkSearch(q="(#hello(world) OR #java) AND NOT #deprecated")
+        query = queries.query_bookmarks(self.user, self.profile, search)
+        self.assertCountEqual(list(query), [paren_bookmark, self.java_bookmark])
+
+        # Grouping without a parenthesized tag keeps working
+        search = BookmarkSearch(q="(#javascript OR #java)")
+        query = queries.query_bookmarks(self.user, self.profile, search)
+        self.assertCountEqual(
+            list(query), [self.javascript_tutorial, self.java_bookmark]
+        )
+
+        # Grouped boolean with an extra AND tag still works
+        search = BookmarkSearch(q="(#javascript or #java) #tutorial")
+        query = queries.query_bookmarks(self.user, self.profile, search)
+        self.assertCountEqual(list(query), [self.javascript_tutorial])
+
+        # Negating a parenthesized tag excludes only that bookmark
+        search = BookmarkSearch(q="#hello(world) AND NOT #java")
+        query = queries.query_bookmarks(self.user, self.profile, search)
+        self.assertCountEqual(list(query), [paren_bookmark])
 
     def test_complex_query_with_all_operators(self):
         # Set lax mode to allow term matching against tags

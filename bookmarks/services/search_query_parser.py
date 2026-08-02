@@ -43,14 +43,41 @@ class SearchQueryTokenizer:
             self.advance()
 
     def read_term(self) -> str:
-        """Read a search term (sequence of non-whitespace, non-special characters)."""
-        term = ""
+        """Read a search term (sequence of non-whitespace characters).
 
-        while (
-            self.current_char
-            and not self.current_char.isspace()
-            and self.current_char not in "()\"'#!"
-        ):
+        Parentheses may be part of a term (for example ``hello(world)`` in lax
+        tag search), so they are only treated as grouping operators when they
+        are not balanced within the term. If a quote or other special character
+        appears before the parentheses balance, absorption is aborted and the
+        tokenizer rewinds to the first unmatched ``(`` so it is emitted as a
+        grouping token instead (e.g. ``alert('xss')``).
+        """
+        start_pos = self.position
+        term = ""
+        paren_depth = 0
+        open_paren_positions: list[int] = []
+
+        while self.current_char and not self.current_char.isspace():
+            if self.current_char in "\"'#!":
+                if paren_depth > 0:
+                    # Quote/special char inside unbalanced parens — treat the
+                    # first open paren as grouping, not part of the term.
+                    first_open = open_paren_positions[0]
+                    self.position = first_open
+                    self.current_char = self.query[first_open]
+                    return self.query[start_pos:first_open]
+                break
+            if self.current_char == ")":
+                if paren_depth == 0:
+                    # Unmatched closing parenthesis ends the term and is
+                    # tokenized as a grouping operator instead
+                    break
+                paren_depth -= 1
+                open_paren_positions.pop()
+            elif self.current_char == "(":
+                open_paren_positions.append(self.position)
+                paren_depth += 1
+
             term += self.current_char
             self.advance()
 
@@ -94,15 +121,48 @@ class SearchQueryTokenizer:
         return content
 
     def read_tag(self) -> str:
-        """Read a tag (starts with # and continues until whitespace or special chars)."""
-        tag = ""
+        """Read a tag (starts with #).
+
+        Supports both bare names (``#python``, ``#hello(world)``) and quoted
+        names (``#"hello(world)"``) for an unambiguous escape hatch.
+
+        Parentheses may be part of a bare tag name, so they are only treated as
+        grouping operators when they are not balanced within the tag. That keeps
+        grouping syntax such as ``(#python or #js)`` working, where the closing
+        parenthesis does not belong to the tag.
+        """
         self.advance()  # skip the # character
 
-        while (
-            self.current_char
-            and not self.current_char.isspace()
-            and self.current_char not in "()\"'"
-        ):
+        # Quoted tag name: #"hello(world)" or #'hello(world)'
+        if self.current_char and self.current_char in "\"'":
+            return self.read_quoted_string(self.current_char)
+
+        start_pos = self.position
+        tag = ""
+        paren_depth = 0
+        open_paren_positions: list[int] = []
+
+        while self.current_char and not self.current_char.isspace():
+            if self.current_char in "\"'":
+                if paren_depth > 0:
+                    # Quote inside unbalanced parens — rewind to first open
+                    # paren so it is emitted as a grouping token instead.
+                    first_open = open_paren_positions[0]
+                    self.position = first_open
+                    self.current_char = self.query[first_open]
+                    return self.query[start_pos:first_open]
+                break
+            if self.current_char == ")":
+                if paren_depth == 0:
+                    # Unmatched closing parenthesis ends the tag and is
+                    # tokenized as a grouping operator instead
+                    break
+                paren_depth -= 1
+                open_paren_positions.pop()
+            elif self.current_char == "(":
+                open_paren_positions.append(self.position)
+                paren_depth += 1
+
             tag += self.current_char
             self.advance()
 
@@ -350,6 +410,18 @@ def _is_simple_expression(expr: SearchExpression) -> bool:
     return isinstance(expr, (TermExpression, TagExpression, SpecialKeywordExpression))
 
 
+def format_tag_for_query(tag_name: str) -> str:
+    """Format a tag name for inclusion in a search query string.
+
+    Tags containing spaces, parentheses, or quotes are emitted as quoted tags
+    (``#"name"``) so they round-trip through the tokenizer unambiguously.
+    """
+    if " " in tag_name or any(c in tag_name for c in ["(", ")", '"', "'"]):
+        escaped = tag_name.replace("\\", "\\\\").replace('"', '\\"')
+        return f'#"{escaped}"'
+    return f"#{tag_name}"
+
+
 def _expression_to_string(expr: SearchExpression, parent_type: type = None) -> str:
     if isinstance(expr, TermExpression):
         # Quote terms if they contain spaces or special characters
@@ -360,7 +432,7 @@ def _expression_to_string(expr: SearchExpression, parent_type: type = None) -> s
         return expr.term
 
     elif isinstance(expr, TagExpression):
-        return f"#{expr.tag}"
+        return format_tag_for_query(expr.tag)
 
     elif isinstance(expr, SpecialKeywordExpression):
         return f"!{expr.keyword}"
