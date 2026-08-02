@@ -264,6 +264,60 @@ class SearchQueryTokenizerTest(TestCase):
         self.assertEqual(tokens[4].value, "web")
         self.assertEqual(tokens[5].type, TokenType.EOF)
 
+    def test_tag_with_parentheses_in_name(self):
+        # Balanced parentheses are part of the tag name
+        tokenizer = SearchQueryTokenizer("#hello(world)")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "hello(world)")
+        self.assertEqual(tokens[1].type, TokenType.EOF)
+
+        # Nested parentheses
+        tokenizer = SearchQueryTokenizer("#a(b(c))d")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "a(b(c))d")
+        self.assertEqual(tokens[1].type, TokenType.EOF)
+
+    def test_tag_with_parentheses_in_name_mixed_with_terms(self):
+        tokenizer = SearchQueryTokenizer("#hello(world) tutorial")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 3)
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "hello(world)")
+        self.assertEqual(tokens[1].type, TokenType.TERM)
+        self.assertEqual(tokens[1].value, "tutorial")
+        self.assertEqual(tokens[2].type, TokenType.EOF)
+
+    def test_tag_does_not_consume_unmatched_closing_parenthesis(self):
+        # Grouping parentheses must keep working around tags
+        tokenizer = SearchQueryTokenizer("(#python or #js)")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 6)
+        self.assertEqual(tokens[0].type, TokenType.LPAREN)
+        self.assertEqual(tokens[1].type, TokenType.TAG)
+        self.assertEqual(tokens[1].value, "python")
+        self.assertEqual(tokens[2].type, TokenType.OR)
+        self.assertEqual(tokens[3].type, TokenType.TAG)
+        self.assertEqual(tokens[3].value, "js")
+        self.assertEqual(tokens[4].type, TokenType.RPAREN)
+        self.assertEqual(tokens[5].type, TokenType.EOF)
+
+        # Same when the grouped tag itself contains parentheses
+        tokenizer = SearchQueryTokenizer("(#hello(world) or #js)")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 6)
+        self.assertEqual(tokens[0].type, TokenType.LPAREN)
+        self.assertEqual(tokens[1].type, TokenType.TAG)
+        self.assertEqual(tokens[1].value, "hello(world)")
+        self.assertEqual(tokens[2].type, TokenType.OR)
+        self.assertEqual(tokens[3].type, TokenType.TAG)
+        self.assertEqual(tokens[3].value, "js")
+        self.assertEqual(tokens[4].type, TokenType.RPAREN)
+        self.assertEqual(tokens[5].type, TokenType.EOF)
+
     def test_empty_tag(self):
         # Tag with just # should be ignored (no token created)
         tokenizer = SearchQueryTokenizer("# ")
@@ -567,6 +621,24 @@ class SearchQueryParserTest(TestCase):
         expected = _and(_or(_tag("frontend"), _tag("backend")), _term("javascript"))
         self.assertEqual(result, expected)
 
+    def test_tag_with_parentheses_in_name(self):
+        result = parse_search_query("#hello(world)")
+        expected = _tag("hello(world)")
+        self.assertEqual(result, expected)
+
+        result = parse_search_query("#hello(world) and #python")
+        expected = _and(_tag("hello(world)"), _tag("python"))
+        self.assertEqual(result, expected)
+
+    def test_tag_with_parentheses_in_name_within_group(self):
+        result = parse_search_query("(#hello(world) or #python) and tutorial")
+        expected = _and(_or(_tag("hello(world)"), _tag("python")), _term("tutorial"))
+        self.assertEqual(result, expected)
+
+        result = parse_search_query("not #hello(world)")
+        expected = _not(_tag("hello(world)"))
+        self.assertEqual(result, expected)
+
     def test_empty_tags_ignored(self):
         # Test single empty tag
         result = parse_search_query("#")
@@ -856,6 +928,10 @@ class ExpressionToStringTest(TestCase):
         expr = _tag("python")
         self.assertEqual(expression_to_string(expr), "#python")
 
+    def test_tag_with_parentheses_in_name(self):
+        expr = _tag("hello(world)")
+        self.assertEqual(expression_to_string(expr), "#hello(world)")
+
     def test_simple_keyword(self):
         expr = _keyword("unread")
         self.assertEqual(expression_to_string(expr), "!unread")
@@ -926,6 +1002,9 @@ class ExpressionToStringTest(TestCase):
             "tutorial and (python or ruby)",
             "(python or ruby) tutorial",
             "tutorial (python or ruby)",
+            "#hello(world)",
+            "#hello(world) #python",
+            "(#hello(world) or #python) tutorial",
         ]
 
         for query in test_cases:
@@ -1017,6 +1096,13 @@ class StripTagFromQueryTest(TestCase):
         # Should not remove #book when removing #books
         result = strip_tag_from_query("#book and #books", "books")
         self.assertEqual(result, "#book")
+
+    def test_tag_with_parentheses_in_name(self):
+        result = strip_tag_from_query("#hello(world) and #books", "hello(world)")
+        self.assertEqual(result, "#books")
+
+        result = strip_tag_from_query("#hello(world)", "hello(world)")
+        self.assertEqual(result, "")
 
     def test_invalid_query_returns_original(self):
         # If query is malformed, should return original
@@ -1203,6 +1289,10 @@ class ExtractTagNamesFromQueryTest(TestCase):
     def test_tags_with_hyphens(self):
         result = extract_tag_names_from_query("#machine-learning and #deep-learning")
         self.assertEqual(result, ["deep-learning", "machine-learning"])
+
+    def test_tags_with_parentheses_in_name(self):
+        result = extract_tag_names_from_query("#hello(world) or #python")
+        self.assertEqual(result, ["hello(world)", "python"])
 
 
 class ExtractTagNamesFromQueryLaxSearchTest(TestCase):

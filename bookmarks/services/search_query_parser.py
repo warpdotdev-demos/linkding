@@ -94,15 +94,29 @@ class SearchQueryTokenizer:
         return content
 
     def read_tag(self) -> str:
-        """Read a tag (starts with # and continues until whitespace or special chars)."""
+        """Read a tag (starts with # and continues until whitespace or quotes).
+
+        Parentheses may be part of a tag name, for example ``#hello(world)``, so
+        they are only treated as grouping operators when they are not balanced
+        within the tag. That keeps grouping syntax such as ``(#python or #js)``
+        working, where the closing parenthesis does not belong to the tag.
+        """
         tag = ""
+        paren_depth = 0
         self.advance()  # skip the # character
 
-        while (
-            self.current_char
-            and not self.current_char.isspace()
-            and self.current_char not in "()\"'"
-        ):
+        while self.current_char and not self.current_char.isspace():
+            if self.current_char in "\"'":
+                break
+            if self.current_char == ")":
+                if paren_depth == 0:
+                    # Unmatched closing parenthesis, ends the tag and is
+                    # tokenized as a grouping operator instead
+                    break
+                paren_depth -= 1
+            elif self.current_char == "(":
+                paren_depth += 1
+
             tag += self.current_char
             self.advance()
 
