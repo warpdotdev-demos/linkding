@@ -1679,6 +1679,15 @@ class QueriesAdvancedSearchTestCase(TestCase, BookmarkFactoryMixin):
         query = queries.query_bookmarks(self.user, self.profile, search)
         self.assertCountEqual(list(query), [self.python_bookmark])
 
+    def test_tag_with_literal_parentheses(self):
+        parenthesized_tag_bookmark = self.setup_bookmark(
+            title="Parenthesized Tag",
+            tags=[self.setup_tag(name="hello(world)")],
+        )
+        search = BookmarkSearch(q="#hello(world)")
+        query = queries.query_bookmarks(self.user, self.profile, search)
+        self.assertCountEqual(list(query), [parenthesized_tag_bookmark])
+
     def test_or_operator(self):
         search = BookmarkSearch(q="#python OR #java")
         query = queries.query_bookmarks(self.user, self.profile, search)

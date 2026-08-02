@@ -567,6 +567,16 @@ class SearchQueryParserTest(TestCase):
         expected = _and(_or(_tag("frontend"), _tag("backend")), _term("javascript"))
         self.assertEqual(result, expected)
 
+    def test_tag_with_literal_parentheses(self):
+        result = parse_search_query("#hello(world)")
+        self.assertEqual(result, _tag("hello(world)"))
+
+        grouped_result = parse_search_query("(#frontend or #backend) and javascript")
+        grouped_expected = _and(
+            _or(_tag("frontend"), _tag("backend")), _term("javascript")
+        )
+        self.assertEqual(grouped_result, grouped_expected)
+
     def test_empty_tags_ignored(self):
         # Test single empty tag
         result = parse_search_query("#")

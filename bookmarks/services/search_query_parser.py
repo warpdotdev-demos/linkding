@@ -94,15 +94,19 @@ class SearchQueryTokenizer:
         return content
 
     def read_tag(self) -> str:
-        """Read a tag (starts with # and continues until whitespace or special chars)."""
+        """Read a tag (starts with # and continues until whitespace or quotes)."""
         tag = ""
+        parenthesis_depth = 0
         self.advance()  # skip the # character
-
-        while (
-            self.current_char
-            and not self.current_char.isspace()
-            and self.current_char not in "()\"'"
-        ):
+        while self.current_char and not self.current_char.isspace():
+            if self.current_char in "\"'":
+                break
+            if self.current_char == ")" and parenthesis_depth == 0:
+                break
+            if self.current_char == "(":
+                parenthesis_depth += 1
+            elif self.current_char == ")":
+                parenthesis_depth -= 1
             tag += self.current_char
             self.advance()
 
