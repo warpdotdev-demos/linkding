@@ -301,3 +301,39 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
                 "unread": BookmarkSearch.FILTER_UNREAD_OFF,
             },
         )
+
+    def test_global_search_from_request(self):
+        request = MockRequest(self.get_or_create_test_user())
+        bundle = self.setup_bundle()
+
+        # global_search=1 in query string coerces to True
+        query_dict = QueryDict(f"bundle={bundle.id}&global_search=1")
+        search = BookmarkSearch.from_request(request, query_dict)
+        self.assertTrue(search.global_search)
+
+        # global_search absent defaults to False
+        query_dict = QueryDict(f"bundle={bundle.id}")
+        search = BookmarkSearch.from_request(request, query_dict)
+        self.assertFalse(search.global_search)
+
+        # global_search=0 is falsy, treated as absent
+        query_dict = QueryDict(f"bundle={bundle.id}&global_search=0")
+        search = BookmarkSearch.from_request(request, query_dict)
+        self.assertFalse(search.global_search)
+
+    def test_global_search_query_params_serialisation(self):
+        bundle = self.setup_bundle()
+
+        # global_search=True serialises to "1"
+        search = BookmarkSearch(bundle=bundle, global_search=True)
+        self.assertIn("global_search", search.query_params)
+        self.assertEqual(search.query_params["global_search"], "1")
+
+        # global_search=False (default) is NOT emitted in query_params
+        search = BookmarkSearch(bundle=bundle, global_search=False)
+        self.assertNotIn("global_search", search.query_params)
+
+        # global_search=True without bundle still serialises to "1"
+        search = BookmarkSearch(global_search=True)
+        self.assertIn("global_search", search.query_params)
+        self.assertEqual(search.query_params["global_search"], "1")

@@ -1609,6 +1609,54 @@ class QueriesBasicTestCase(TestCase, BookmarkFactoryMixin):
         )
         self.assertQueryResult(query, [matching_bookmarks])
 
+    def test_query_bookmarks_global_search_ignores_bundle_filter(self):
+        # Bundle restricts to bookmarks with bundleTag
+        bundle_tag = self.setup_tag(name="bundleTag")
+        bundle = self.setup_bundle(any_tags="bundleTag")
+
+        # Bookmarks inside the bundle (have bundle tag)
+        in_bundle = [
+            self.setup_bookmark(tags=[bundle_tag]),
+            self.setup_bookmark(tags=[bundle_tag]),
+        ]
+        # Bookmarks outside the bundle (no bundle tag)
+        outside_bundle = [
+            self.setup_bookmark(),
+            self.setup_bookmark(),
+        ]
+        all_bookmarks = in_bundle + outside_bundle
+
+        # Without global_search: only in-bundle bookmarks returned
+        search_scoped = BookmarkSearch(bundle=bundle, global_search=False)
+        query = queries.query_bookmarks(self.user, self.profile, search_scoped)
+        self.assertQueryResult(query, [in_bundle])
+
+        # With global_search=True: all bookmarks returned (bundle filter bypassed)
+        search_global = BookmarkSearch(bundle=bundle, global_search=True)
+        query = queries.query_bookmarks(self.user, self.profile, search_global)
+        self.assertQueryResult(query, [all_bookmarks])
+
+    def test_query_bookmark_tags_global_search_reflects_global_scope(self):
+        # Bundle restricts to bookmarks with bundleTag
+        bundle_tag = self.setup_tag(name="bundleTag")
+        out_tag = self.setup_tag(name="outsideTag")
+        bundle = self.setup_bundle(any_tags="bundleTag")
+
+        self.setup_bookmark(tags=[bundle_tag])
+        self.setup_bookmark(tags=[out_tag])  # outside bundle
+
+        # Without global_search: only tags from in-bundle bookmarks
+        search_scoped = BookmarkSearch(bundle=bundle, global_search=False)
+        tags = list(queries.query_bookmark_tags(self.user, self.profile, search_scoped))
+        self.assertIn(bundle_tag, tags)
+        self.assertNotIn(out_tag, tags)
+
+        # With global_search=True: tags from all bookmarks
+        search_global = BookmarkSearch(bundle=bundle, global_search=True)
+        tags = list(queries.query_bookmark_tags(self.user, self.profile, search_global))
+        self.assertIn(bundle_tag, tags)
+        self.assertIn(out_tag, tags)
+
     def test_query_shared_bookmarks_with_bundle(self):
         user1 = self.setup_user(enable_sharing=True)
         user2 = self.setup_user(enable_sharing=True)

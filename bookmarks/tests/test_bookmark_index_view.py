@@ -632,3 +632,53 @@ class BookmarkIndexViewTestCase(
         html = response.content.decode()
 
         self.assertInHTML('<h2 id="bundles-heading">Bundles</h2>', html, count=0)
+
+    def test_global_search_toggle_absent_without_bundle(self):
+        # No bundle in URL — toggle must not be rendered
+        response = self.client.get(reverse("linkding:bookmarks.index") + "?q=python")
+        html = response.content.decode()
+        self.assertNotIn("global-search-toggle", html)
+
+    def test_global_search_toggle_present_with_bundle(self):
+        bundle = self.setup_bundle(search="python")
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        html = response.content.decode()
+        self.assertIn("global-search-toggle", html)
+        # Shows "Search everywhere" link (not yet in global mode)
+        self.assertIn("Search everywhere", html)
+        self.assertNotIn("Bundle scope", html)
+
+    def test_global_search_toggle_active_state_with_global_search_param(self):
+        bundle = self.setup_bundle(search="python")
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+        html = response.content.decode()
+        self.assertIn("global-search-toggle", html)
+        # Shows "Bundle scope" link (in global mode)
+        self.assertIn("Bundle scope", html)
+        self.assertNotIn("Search everywhere", html)
+
+    def test_global_search_shows_all_bookmarks_when_active(self):
+        bundle_tag = self.setup_tag(name="bundleTag")
+        bundle = self.setup_bundle(any_tags="bundleTag")
+
+        in_bundle = self.setup_bookmark(title="InBundleBook", tags=[bundle_tag])
+        outside_bundle = self.setup_bookmark(title="OutsideBook")
+
+        # Without global_search: only in-bundle bookmarks visible
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        self.assertVisibleBookmarks(response, [in_bundle])
+        self.assertInvisibleBookmarks(response, [outside_bundle])
+
+        # With global_search=1: both bookmarks visible
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&global_search=1"
+        )
+        self.assertVisibleBookmarks(response, [in_bundle, outside_bundle])

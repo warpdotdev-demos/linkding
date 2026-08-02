@@ -13,6 +13,15 @@
     <input type="submit" value="Search" class="d-none">
     {% for hidden_field in search_form.hidden_fields %}{{ hidden_field }}{% endfor %}
   </form>
+  {% if search.bundle %}
+    <div class="global-search-toggle">
+      {% if search.global_search %}
+        <a href="{{ back_to_bundle_url }}" class="btn btn-link btn-sm">Bundle scope</a>
+      {% else %}
+        <a href="{{ search_everywhere_url }}" class="btn btn-link btn-sm">Search everywhere</a>
+      {% endif %}
+    </div>
+  {% endif %}
   <ld-dropdown class="search-options dropdown dropdown-right">
     <button type="button"
             aria-label="Search preferences"

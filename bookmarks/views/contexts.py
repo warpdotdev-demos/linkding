@@ -224,6 +224,27 @@ class BookmarkListContext:
         self.return_url = request_context.index()
         self.action_url = request_context.action()
 
+        if search.bundle:
+            params_with_global = {**search.query_params, "global_search": "1"}
+            params_without_global = {
+                k: v for k, v in search.query_params.items() if k != "global_search"
+            }
+            self.search_everywhere_url = (
+                request_context.index_url
+                + "?"
+                + urllib.parse.urlencode(params_with_global)
+            )
+            self.back_to_bundle_url = (
+                request_context.index_url
+                + "?"
+                + urllib.parse.urlencode(params_without_global)
+                if params_without_global
+                else request_context.index_url
+            )
+        else:
+            self.search_everywhere_url = None
+            self.back_to_bundle_url = None
+
         self.link_target = user_profile.bookmark_link_target
         self.date_display = user_profile.bookmark_date_display
         self.description_display = user_profile.bookmark_description_display
