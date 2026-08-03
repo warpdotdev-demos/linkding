@@ -253,13 +253,10 @@ class BookmarkNewViewTestCase(TestCase, BookmarkFactoryMixin):
             html,
         )
 
-    def test_should_hide_notes_if_there_are_no_notes(self):
-        bookmark = self.setup_bookmark()
-        response = self.client.get(
-            reverse("linkding:bookmarks.edit", args=[bookmark.id])
-        )
+    def test_should_show_notes_expanded_by_default(self):
+        response = self.client.get(reverse("linkding:bookmarks.new"))
 
-        self.assertContains(response, '<details class="notes">', count=1)
+        self.assertContains(response, '<details class="notes" open>', count=1)
 
     def test_should_not_check_unread_by_default(self):
         response = self.client.get(reverse("linkding:bookmarks.new"))

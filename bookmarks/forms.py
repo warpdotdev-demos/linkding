@@ -88,6 +88,14 @@ class BookmarkForm(forms.ModelForm):
             self.instance and self.instance.notes
         )
 
+    @property
+    def show_notes_expanded(self):
+        # Always expand notes when adding a bookmark so the field is discoverable.
+        # On edit, keep the existing collapse-when-empty behavior.
+        if not self.instance.pk:
+            return True
+        return self.has_notes
+
     def save(self, commit=False):
         tag_string = convert_tag_string(self.data["tag_string"])
         bookmark = super().save(commit=False)
