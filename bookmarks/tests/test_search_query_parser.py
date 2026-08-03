@@ -369,6 +369,46 @@ class SearchQueryTokenizerTest(TestCase):
         self.assertEqual(tokens[5].type, TokenType.RPAREN)
         self.assertEqual(tokens[6].type, TokenType.EOF)
 
+    def test_unmatched_opening_parenthesis_at_end_of_tag(self):
+        # Unmatched open paren must not be absorbed into the tag name
+        tokenizer = SearchQueryTokenizer("#hello(")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 3)
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "hello")
+        self.assertEqual(tokens[1].type, TokenType.LPAREN)
+        self.assertEqual(tokens[2].type, TokenType.EOF)
+
+        # Same when followed by more tokens after whitespace
+        tokenizer = SearchQueryTokenizer("#hello( #python")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 4)
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "hello")
+        self.assertEqual(tokens[1].type, TokenType.LPAREN)
+        self.assertEqual(tokens[2].type, TokenType.TAG)
+        self.assertEqual(tokens[2].value, "python")
+        self.assertEqual(tokens[3].type, TokenType.EOF)
+
+    def test_unmatched_opening_parenthesis_at_end_of_term(self):
+        tokenizer = SearchQueryTokenizer("hello(")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 3)
+        self.assertEqual(tokens[0].type, TokenType.TERM)
+        self.assertEqual(tokens[0].value, "hello")
+        self.assertEqual(tokens[1].type, TokenType.LPAREN)
+        self.assertEqual(tokens[2].type, TokenType.EOF)
+
+        tokenizer = SearchQueryTokenizer("hello( world")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 4)
+        self.assertEqual(tokens[0].type, TokenType.TERM)
+        self.assertEqual(tokens[0].value, "hello")
+        self.assertEqual(tokens[1].type, TokenType.LPAREN)
+        self.assertEqual(tokens[2].type, TokenType.TERM)
+        self.assertEqual(tokens[2].value, "world")
+        self.assertEqual(tokens[3].type, TokenType.EOF)
+
     def test_empty_tag(self):
         # Tag with just # should be ignored (no token created)
         tokenizer = SearchQueryTokenizer("# ")
@@ -712,6 +752,14 @@ class SearchQueryParserTest(TestCase):
         result = parse_search_query("hello(world)")
         expected = _term("hello(world)")
         self.assertEqual(result, expected)
+
+    def test_unmatched_opening_parenthesis_at_end_of_tag_raises(self):
+        # #hello( tokenizes as TAG("hello") LPAREN, which is an unclosed group
+        with self.assertRaises(SearchQueryParseError):
+            parse_search_query("#hello(")
+
+        with self.assertRaises(SearchQueryParseError):
+            parse_search_query("hello(")
 
     def test_empty_tags_ignored(self):
         # Test single empty tag

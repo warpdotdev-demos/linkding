@@ -47,10 +47,11 @@ class SearchQueryTokenizer:
 
         Parentheses may be part of a term (for example ``hello(world)`` in lax
         tag search), so they are only treated as grouping operators when they
-        are not balanced within the term. If a quote or other special character
-        appears before the parentheses balance, absorption is aborted and the
-        tokenizer rewinds to the first unmatched ``(`` so it is emitted as a
-        grouping token instead (e.g. ``alert('xss')``).
+        are not balanced within the term. If a quote/special character appears
+        before the parentheses balance, or the token ends (whitespace/EOF) with
+        nonzero depth, absorption is aborted and the tokenizer rewinds to the
+        first unmatched ``(`` so it is emitted as a grouping token instead
+        (e.g. ``alert('xss')``, ``hello(``).
         """
         start_pos = self.position
         term = ""
@@ -80,6 +81,15 @@ class SearchQueryTokenizer:
 
             term += self.current_char
             self.advance()
+
+        # Unmatched opening parenthesis at end of token — rewind so the first
+        # open paren is emitted as a grouping delimiter instead of part of the
+        # term (e.g. ``hello(`` → TERM("hello") LPAREN).
+        if paren_depth > 0:
+            first_open = open_paren_positions[0]
+            self.position = first_open
+            self.current_char = self.query[first_open]
+            return self.query[start_pos:first_open]
 
         return term
 
@@ -165,6 +175,15 @@ class SearchQueryTokenizer:
 
             tag += self.current_char
             self.advance()
+
+        # Unmatched opening parenthesis at end of token — rewind so the first
+        # open paren is emitted as a grouping delimiter instead of part of the
+        # tag (e.g. ``#hello(`` → TAG("hello") LPAREN).
+        if paren_depth > 0:
+            first_open = open_paren_positions[0]
+            self.position = first_open
+            self.current_char = self.query[first_open]
+            return self.query[start_pos:first_open]
 
         return tag
 
