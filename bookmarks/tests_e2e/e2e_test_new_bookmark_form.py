@@ -134,7 +134,8 @@ class BookmarkFormE2ETestCase(LinkdingE2ETestCase):
         page = self.open(reverse("linkding:bookmarks.new"))
 
         details = page.locator("details.notes")
-        expect(details).not_to_have_attribute("open", value="")
+        # Add form defaults to Notes expanded; existing-bookmark prefills keep it open when notes exist
+        expect(details).to_have_attribute("open", value="")
 
         page.get_by_label("URL").fill(bookmark.url)
         expect(details).to_have_attribute("open", value="")
