@@ -474,6 +474,25 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         self.assertEqual(tag_links[1].text, "#tag2")
         self.assertEqual(tag_links[2].text, "#tag3")
 
+    def test_bookmark_tag_with_parentheses_query_string(self):
+        # Regression for OSFG-74: clicking a tag with () must quote it in the query
+        self.setup_bookmark(tags=[self.setup_tag(name="hello(world)")])
+
+        html = self.render_template()
+        soup = self.make_soup(html)
+        tag_link = soup.find("a", string="#hello(world)")
+        self.assertIsNotNone(tag_link)
+        self.assertEqual(tag_link["href"], '?q=%23%22hello%28world%29%22')
+
+        # Normal tags remain unquoted
+        Bookmark.objects.all().delete()
+        self.setup_bookmark(tags=[self.setup_tag(name="normal")])
+        html = self.render_template()
+        soup = self.make_soup(html)
+        tag_link = soup.find("a", string="#normal")
+        self.assertIsNotNone(tag_link)
+        self.assertEqual(tag_link["href"], "?q=%23normal")
+
     def test_bookmark_tag_query_string(self):
         # appends tag to existing query string
         bookmark = self.setup_bookmark(title="term1 term2")

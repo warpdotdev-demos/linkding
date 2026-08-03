@@ -184,6 +184,43 @@ class BookmarkIndexViewTestCase(
 
         self.assertSelectedTags(response, [tags[0], tags[1]])
 
+    def test_should_find_bookmark_by_tag_with_parentheses(self):
+        # Regression for OSFG-74: searching/selecting a tag like hello(world)
+        paren_tag = self.setup_tag(name="hello(world)")
+        normal_tag = self.setup_tag(name="normal")
+        other_tag = self.setup_tag(name="other")
+
+        paren_bookmark = self.setup_bookmark(
+            title="Paren Bookmark", tags=[paren_tag]
+        )
+        normal_bookmark = self.setup_bookmark(
+            title="Normal Bookmark", tags=[normal_tag]
+        )
+        other_bookmark = self.setup_bookmark(title="Other Bookmark", tags=[other_tag])
+
+        # Quoted tag search returns the matching bookmark
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + '?q=%23%22hello(world)%22'
+        )
+        self.assertVisibleBookmarks(response, [paren_bookmark])
+        self.assertInvisibleBookmarks(response, [normal_bookmark, other_bookmark])
+        self.assertSelectedTags(response, [paren_tag])
+
+        # Normal tag still works
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + "?q=%23normal"
+        )
+        self.assertVisibleBookmarks(response, [normal_bookmark])
+        self.assertInvisibleBookmarks(response, [paren_bookmark, other_bookmark])
+
+        # Boolean OR still works
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + '?q=%23%22hello(world)%22+or+%23other'
+        )
+        self.assertVisibleBookmarks(response, [paren_bookmark, other_bookmark])
+        self.assertInvisibleBookmarks(response, [normal_bookmark])
+
     def test_should_not_display_search_terms_from_query_as_selected_tags_in_strict_mode(
         self,
     ):

@@ -14,6 +14,7 @@ from bookmarks.services.search_query_parser import (
     TokenType,
     expression_to_string,
     extract_tag_names_from_query,
+    format_tag_for_query,
     parse_search_query,
     strip_tag_from_query,
 )
@@ -238,6 +239,32 @@ class SearchQueryTokenizerTest(TestCase):
         self.assertEqual(tokens[0].type, TokenType.TAG)
         self.assertEqual(tokens[0].value, "machine-learning")
         self.assertEqual(tokens[1].type, TokenType.EOF)
+
+    def test_quoted_tags_with_special_characters(self):
+        # Double-quoted tag containing parentheses (OSFG-74)
+        tokenizer = SearchQueryTokenizer('#"hello(world)"')
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "hello(world)")
+        self.assertEqual(tokens[1].type, TokenType.EOF)
+
+        # Single-quoted tag
+        tokenizer = SearchQueryTokenizer("#\'hello(world)\'")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "hello(world)")
+
+        # Bare tag with parentheses still tokenizes as TAG + grouping (unchanged)
+        tokenizer = SearchQueryTokenizer("#hello(world)")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "hello")
+        self.assertEqual(tokens[1].type, TokenType.LPAREN)
+        self.assertEqual(tokens[2].type, TokenType.TERM)
+        self.assertEqual(tokens[2].value, "world")
+        self.assertEqual(tokens[3].type, TokenType.RPAREN)
 
     def test_tags_with_operators(self):
         tokenizer = SearchQueryTokenizer("#python and #django")
@@ -534,6 +561,26 @@ class SearchQueryParserTest(TestCase):
         # Tag with hyphens
         result = parse_search_query("#machine-learning")
         expected = _tag("machine-learning")
+        self.assertEqual(result, expected)
+
+    def test_quoted_tag_with_parentheses(self):
+        # Quoted form matches a tag literally named hello(world)
+        result = parse_search_query('#"hello(world)"')
+        expected = _tag("hello(world)")
+        self.assertEqual(result, expected)
+
+        result = parse_search_query("#\'hello(world)\'")
+        expected = _tag("hello(world)")
+        self.assertEqual(result, expected)
+
+        # Bare parentheses keep grouping semantics: #hello(world) is not one tag
+        result = parse_search_query("#hello(world)")
+        expected = _and(_tag("hello"), _term("world"))
+        self.assertEqual(result, expected)
+
+        # Quoted tag still composes with boolean operators
+        result = parse_search_query('#"hello(world)" or #normal')
+        expected = _or(_tag("hello(world)"), _tag("normal"))
         self.assertEqual(result, expected)
 
     def test_tags_with_operators(self):
@@ -856,6 +903,22 @@ class ExpressionToStringTest(TestCase):
         expr = _tag("python")
         self.assertEqual(expression_to_string(expr), "#python")
 
+    def test_tag_with_parentheses_is_quoted(self):
+        expr = _tag("hello(world)")
+        self.assertEqual(expression_to_string(expr), '#"hello(world)"')
+        self.assertEqual(format_tag_for_query("hello(world)"), '#"hello(world)"')
+        self.assertEqual(format_tag_for_query("normal"), "#normal")
+
+        # Round-trip: strip/rebuild must preserve the special tag
+        self.assertEqual(
+            strip_tag_from_query('#python #"hello(world)"', "python"),
+            '#"hello(world)"',
+        )
+        self.assertEqual(
+            strip_tag_from_query('#"hello(world)" #python', "hello(world)"),
+            "#python",
+        )
+
     def test_simple_keyword(self):
         expr = _keyword("unread")
         self.assertEqual(expression_to_string(expr), "!unread")
@@ -926,6 +989,8 @@ class ExpressionToStringTest(TestCase):
             "tutorial and (python or ruby)",
             "(python or ruby) tutorial",
             "tutorial (python or ruby)",
+            '#"hello(world)"',
+            '#"hello(world)" or #normal',
         ]
 
         for query in test_cases:
@@ -1203,6 +1268,13 @@ class ExtractTagNamesFromQueryTest(TestCase):
     def test_tags_with_hyphens(self):
         result = extract_tag_names_from_query("#machine-learning and #deep-learning")
         self.assertEqual(result, ["deep-learning", "machine-learning"])
+
+    def test_quoted_tag_with_parentheses(self):
+        result = extract_tag_names_from_query('#"hello(world)"')
+        self.assertEqual(result, ["hello(world)"])
+
+        result = extract_tag_names_from_query('#"hello(world)" and #normal')
+        self.assertEqual(result, ["hello(world)", "normal"])
 
 
 class ExtractTagNamesFromQueryLaxSearchTest(TestCase):

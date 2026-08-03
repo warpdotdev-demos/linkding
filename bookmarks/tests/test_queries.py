@@ -1706,6 +1706,59 @@ class QueriesAdvancedSearchTestCase(TestCase, BookmarkFactoryMixin):
         query = queries.query_bookmarks(self.user, self.profile, search)
         self.assertCountEqual(list(query), [self.python_bookmark])
 
+    def test_query_bookmarks_should_search_tag_with_parentheses(self):
+        # Regression for OSFG-74: tags containing () require quoted-tag syntax
+        paren_tag = self.setup_tag(name="hello(world)")
+        normal_tag = self.setup_tag(name="normal")
+        other_tag = self.setup_tag(name="other")
+
+        paren_bookmark = self.setup_bookmark(
+            title="paren tag bookmark", tags=[paren_tag]
+        )
+        normal_bookmark = self.setup_bookmark(
+            title="normal tag bookmark", tags=[normal_tag]
+        )
+        both_bookmark = self.setup_bookmark(
+            title="both tags bookmark", tags=[paren_tag, normal_tag]
+        )
+        other_bookmark = self.setup_bookmark(title="other bookmark", tags=[other_tag])
+
+        # Quoted form finds the special tag
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q='#"hello(world)"')
+        )
+        self.assertCountEqual(list(query), [paren_bookmark, both_bookmark])
+
+        # Bare #hello(world) must not match (grouping semantics unchanged)
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#hello(world)")
+        )
+        self.assertCountEqual(list(query), [])
+
+        # Normal tag search still works
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#normal")
+        )
+        self.assertCountEqual(list(query), [normal_bookmark, both_bookmark])
+
+        # Boolean OR across special + normal tags
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(q='#"hello(world)" or #other'),
+        )
+        self.assertCountEqual(
+            list(query), [paren_bookmark, both_bookmark, other_bookmark]
+        )
+
+        # Boolean AND
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(q='#"hello(world)" #normal'),
+        )
+        self.assertCountEqual(list(query), [both_bookmark])
+
     def test_nested_and_expression(self):
         search = BookmarkSearch(q="nonexistingterm OR (#python AND #tutorial)")
         query = queries.query_bookmarks(self.user, self.profile, search)

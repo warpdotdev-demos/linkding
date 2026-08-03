@@ -94,10 +94,17 @@ class SearchQueryTokenizer:
         return content
 
     def read_tag(self) -> str:
-        """Read a tag (starts with # and continues until whitespace or special chars)."""
-        tag = ""
+        """Read a tag (starts with # and continues until whitespace or special chars).
+
+        Supports quoted tag names so tags containing grouping/quote characters can
+        be matched literally, e.g. #"hello(world)".
+        """
         self.advance()  # skip the # character
 
+        if self.current_char and self.current_char in "\"'":
+            return self.read_quoted_string(self.current_char)
+
+        tag = ""
         while (
             self.current_char
             and not self.current_char.isspace()
@@ -350,6 +357,23 @@ def _is_simple_expression(expr: SearchExpression) -> bool:
     return isinstance(expr, (TermExpression, TagExpression, SpecialKeywordExpression))
 
 
+def _tag_needs_quoting(tag: str) -> bool:
+    """Return True when a tag name must be quoted in a search query."""
+    return (
+        not tag
+        or any(c.isspace() for c in tag)
+        or any(c in tag for c in "()\"'#")
+    )
+
+
+def format_tag_for_query(tag: str) -> str:
+    """Format a tag name as a #tag query token, quoting when needed."""
+    if _tag_needs_quoting(tag):
+        escaped = tag.replace("\\", "\\\\").replace('"', '\\"')
+        return f'#"{escaped}"'
+    return f"#{tag}"
+
+
 def _expression_to_string(expr: SearchExpression, parent_type: type = None) -> str:
     if isinstance(expr, TermExpression):
         # Quote terms if they contain spaces or special characters
@@ -360,7 +384,7 @@ def _expression_to_string(expr: SearchExpression, parent_type: type = None) -> s
         return expr.term
 
     elif isinstance(expr, TagExpression):
-        return f"#{expr.tag}"
+        return format_tag_for_query(expr.tag)
 
     elif isinstance(expr, SpecialKeywordExpression):
         return f"!{expr.keyword}"
