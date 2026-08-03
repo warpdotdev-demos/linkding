@@ -45,11 +45,35 @@
 }
 
 /* Bookmark area header controls */
+.bookmarks-page .search-controls {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--unit-2);
+  margin-left: auto;
+  min-width: 0;
+
+  @media (max-width: 600px) {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+.bookmarks-page .global-search-toggle {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  height: var(--control-size);
+  padding-left: var(--unit-2);
+  padding-right: var(--unit-2);
+}
+
 .bookmarks-page .search-container {
   flex: 1 1 0;
   display: flex;
   max-width: 300px;
-  margin-left: auto;
+  min-width: 0;
 
   & form {
     width: 100%;
@@ -57,7 +81,6 @@
 
   @media (max-width: 600px) {
     max-width: initial;
-    margin-left: 0;
   }
 
   /* Group search options button with search button */

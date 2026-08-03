@@ -86,6 +86,57 @@ class BookmarkIndexViewTestCase(
         self.assertVisibleBookmarks(response, visible_bookmarks)
         self.assertInvisibleBookmarks(response, invisible_bookmarks)
 
+    def test_global_search_toggle_drops_bundle_and_keeps_other_params(self):
+        favorites_tag = self.setup_tag(name="favorites")
+        in_bundle = [
+            self.setup_bookmark(title="foo one", tags=[favorites_tag]),
+            self.setup_bookmark(title="foo two", tags=[favorites_tag]),
+        ]
+        # Same free-text match as the in-bundle bookmarks, but outside the
+        # favorites tag filter that defines the bundle.
+        global_match = self.setup_bookmark(title="foo global match")
+        outside_bundle = self.setup_numbered_bookmarks(2, prefix="bar")
+
+        bundle = self.setup_bundle(name="Favorites", all_tags="favorites")
+
+        # Bundle-scoped search only returns in-bundle matches.
+        bundle_url = (
+            reverse("linkding:bookmarks.index") + f"?q=foo&bundle={bundle.id}"
+        )
+        response = self.client.get(bundle_url)
+        html = response.content.decode()
+        soup = self.make_soup(html)
+
+        self.assertVisibleBookmarks(response, in_bundle)
+        self.assertInvisibleBookmarks(response, outside_bundle + [global_match])
+
+        toggle = soup.select_one("a.global-search-toggle")
+        self.assertIsNotNone(toggle)
+        self.assertEqual(toggle.text.strip(), "Search all")
+
+        # Following the toggle keeps q and drops bundle scope.
+        global_url = reverse("linkding:bookmarks.index") + toggle["href"]
+        self.assertIn("q=foo", global_url)
+        self.assertNotIn("bundle=", global_url)
+
+        response = self.client.get(global_url)
+        soup = self.make_soup(response.content.decode())
+
+        self.assertVisibleBookmarks(response, in_bundle + [global_match])
+        self.assertInvisibleBookmarks(response, outside_bundle)
+        self.assertIsNone(soup.select_one("a.global-search-toggle"))
+        # Bundle param is no longer carried as a hidden search field.
+        search_form = soup.select_one("form#search")
+        self.assertIsNone(
+            search_form.select_one('input[name="bundle"][type="hidden"]')
+        )
+
+    def test_global_search_toggle_absent_without_bundle(self):
+        response = self.client.get(reverse("linkding:bookmarks.index") + "?q=foo")
+        soup = self.make_soup(response.content.decode())
+
+        self.assertIsNone(soup.select_one("a.global-search-toggle"))
+
     def test_should_list_tags_for_unarchived_and_user_owned_bookmarks(self):
         other_user = User.objects.create_user(
             "otheruser", "otheruser@example.com", "password123"
