@@ -21,6 +21,7 @@ from bookmarks.models import (
 from bookmarks.services.search_query_parser import (
     OrExpression,
     SearchQueryParseError,
+    format_tag_for_query,
     parse_search_query,
     strip_tag_from_query,
 )
@@ -293,17 +294,6 @@ class AddTagItem:
         self.tag = tag
         self.name = tag.name
 
-        params = context.query_params.copy()
-        query_with_tag = params.get("q", "")
-        if isinstance(context.search_expression, OrExpression):
-            # If the current search expression is an OR expression, wrap in parentheses
-            query_with_tag = f"({query_with_tag})"
-        query_with_tag = f"{query_with_tag} #{tag.name}".strip()
-
-        params["q"] = query_with_tag
-        params.pop("details", None)
-        params.pop("page", None)
-
         if context.request.user_profile.legacy_search:
             self.query_string = self._generate_query_string_legacy(context, tag)
         else:
@@ -316,7 +306,7 @@ class AddTagItem:
         if isinstance(context.search_expression, OrExpression):
             # If the current search expression is an OR expression, wrap in parentheses
             query_with_tag = f"({query_with_tag})"
-        query_with_tag = f"{query_with_tag} #{tag.name}".strip()
+        query_with_tag = f"{query_with_tag} {format_tag_for_query(tag.name)}".strip()
 
         params["q"] = query_with_tag
         params.pop("details", None)
@@ -328,6 +318,7 @@ class AddTagItem:
     def _generate_query_string_legacy(context: RequestContext, tag: Tag) -> str:
         params = context.query_params.copy()
         query_with_tag = params.get("q", "")
+        # Legacy search splits on whitespace only, so keep the bare form
         query_with_tag = f"{query_with_tag} #{tag.name}".strip()
 
         params["q"] = query_with_tag
