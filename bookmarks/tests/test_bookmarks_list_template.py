@@ -613,6 +613,23 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         self.assertIsNotNone(list_item)
         self.assertListEqual(["unread"], list_item["class"])
 
+    def test_should_render_unread_badge_for_unread_bookmarks(self):
+        self.setup_bookmark(unread=True)
+        html = self.render_template()
+        soup = self.make_soup(html)
+
+        badge = soup.select_one("ul.bookmark-list > li .title .unread-badge")
+        self.assertIsNotNone(badge)
+        self.assertEqual("Unread", badge.text.strip())
+
+    def test_should_not_render_unread_badge_for_read_bookmarks(self):
+        self.setup_bookmark(unread=False)
+        html = self.render_template()
+        soup = self.make_soup(html)
+
+        badge = soup.select_one("ul.bookmark-list > li .title .unread-badge")
+        self.assertIsNone(badge)
+
     def test_should_reflect_shared_state_as_css_class(self):
         profile = self.get_or_create_test_user().profile
         profile.enable_sharing = True
