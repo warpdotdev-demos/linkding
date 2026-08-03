@@ -108,6 +108,39 @@ class BookmarkSearchTagTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         )
         self.assertHiddenInput(search_form, "unread", BookmarkSearch.FILTER_UNREAD_YES)
 
+    def test_global_search_toggle_hidden_without_bundle(self):
+        rendered_template = self.render_template("/test?q=foo&unread=yes")
+        soup = self.make_soup(rendered_template)
+
+        self.assertIsNone(soup.select_one("a.global-search-toggle"))
+
+    def test_global_search_toggle_shown_with_bundle(self):
+        bundle = self.setup_bundle(name="Favorites")
+        rendered_template = self.render_template(
+            f"/test?q=foo&bundle={bundle.id}&unread=yes&sort=title_asc"
+        )
+        soup = self.make_soup(rendered_template)
+        toggle = soup.select_one("a.global-search-toggle")
+
+        self.assertIsNotNone(toggle)
+        self.assertEqual(toggle.text.strip(), "Search all")
+        self.assertIn("Favorites", toggle["title"])
+
+        href = toggle["href"]
+        self.assertIn("q=foo", href)
+        self.assertIn("unread=yes", href)
+        self.assertIn("sort=title_asc", href)
+        self.assertNotIn("bundle=", href)
+
+    def test_global_search_toggle_with_bundle_only(self):
+        bundle = self.setup_bundle(name="Favorites")
+        rendered_template = self.render_template(f"/test?bundle={bundle.id}")
+        soup = self.make_soup(rendered_template)
+        toggle = soup.select_one("a.global-search-toggle")
+
+        self.assertIsNotNone(toggle)
+        self.assertEqual(toggle["href"], ".")
+
     def test_preferences_form_inputs(self):
         # Without params
         url = "/test"
