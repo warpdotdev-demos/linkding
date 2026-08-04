@@ -207,7 +207,6 @@ ul.bookmark-list {
       color: var(--bookmark-title-color);
       font-weight: var(--bookmark-title-weight);
       display: block;
-      width: 100%;
       min-width: 0;
       white-space: nowrap;
       overflow: hidden;
