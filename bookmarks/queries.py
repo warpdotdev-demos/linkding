@@ -173,17 +173,18 @@ def _filter_search_query_legacy(
     return query_set
 
 
-def _filter_bundle(query_set: QuerySet, bundle: BookmarkBundle) -> QuerySet:
-    # Search terms
-    search_terms = parse_query_string(bundle.search)["search_terms"]
-    for term in search_terms:
-        conditions = (
-            Q(title__icontains=term)
-            | Q(description__icontains=term)
-            | Q(notes__icontains=term)
-            | Q(url__icontains=term)
-        )
-        query_set = query_set.filter(conditions)
+def _filter_bundle(
+    query_set: QuerySet, bundle: BookmarkBundle, profile: UserProfile
+) -> QuerySet:
+    # Search terms — same boolean-expression parser as main search
+    if bundle.search and bundle.search.strip():
+        try:
+            ast = parse_search_query(bundle.search)
+            if ast:
+                query_set = query_set.filter(_convert_ast_to_q_object(ast, profile))
+        except SearchQueryParseError:
+            # If the query cannot be parsed, return zero results
+            return query_set.none()
 
     # Any tags - at least one tag must match
     any_tags = parse_tag_string(bundle.any_tags, " ")
@@ -267,7 +268,7 @@ def _base_bookmarks_query(
 
     # Filter by bundle
     if search.bundle:
-        query_set = _filter_bundle(query_set, search.bundle)
+        query_set = _filter_bundle(query_set, search.bundle, profile)
 
     # Sort
     if (
