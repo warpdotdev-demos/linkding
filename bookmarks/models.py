@@ -235,6 +235,10 @@ class BookmarkSearch:
     FILTER_UNREAD_YES = "yes"
     FILTER_UNREAD_NO = "no"
 
+    SCOPE_BUNDLE = "bundle"
+    SCOPE_ALL = "all"
+    SCOPES = [SCOPE_BUNDLE, SCOPE_ALL]
+
     params = [
         "q",
         "user",
@@ -244,8 +248,20 @@ class BookmarkSearch:
         "unread",
         "modified_since",
         "added_since",
+        "scope",
     ]
     preferences = ["sort", "shared", "unread"]
+    # Params that narrow down the result set. Sorting and the search scope do
+    # not narrow down anything, so they are excluded.
+    filter_params = [
+        "q",
+        "user",
+        "bundle",
+        "shared",
+        "unread",
+        "modified_since",
+        "added_since",
+    ]
     defaults = {
         "q": "",
         "user": "",
@@ -255,6 +271,7 @@ class BookmarkSearch:
         "unread": FILTER_UNREAD_OFF,
         "modified_since": None,
         "added_since": None,
+        "scope": SCOPE_BUNDLE,
     }
 
     def __init__(
@@ -267,6 +284,7 @@ class BookmarkSearch:
         unread: str = None,
         modified_since: str = None,
         added_since: str = None,
+        scope: str = None,
         preferences: dict = None,
         request: any = None,
     ):
@@ -283,10 +301,27 @@ class BookmarkSearch:
         self.unread = unread or self.defaults["unread"]
         self.modified_since = modified_since or self.defaults["modified_since"]
         self.added_since = added_since or self.defaults["added_since"]
+        # Unknown scope values fall back to the default scope, so that invalid
+        # input never leaks into generated URLs or hidden form fields
+        self.scope = scope if scope in self.SCOPES else self.defaults["scope"]
 
     def is_modified(self, param):
         value = self.__dict__[param]
         return value != self.defaults[param]
+
+    @property
+    def applies_bundle_filter(self):
+        """Whether the selected bundle narrows down the search.
+
+        In the global scope the bundle stays selected in the UI, but its filter
+        is not applied to the query.
+        """
+        return bool(self.bundle) and self.scope != self.SCOPE_ALL
+
+    @property
+    def has_filters(self):
+        """Whether any param that narrows down the result set is modified."""
+        return any(self.is_modified(param) for param in self.filter_params)
 
     @property
     def modified_params(self):

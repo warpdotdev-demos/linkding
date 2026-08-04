@@ -86,6 +86,41 @@ class BookmarkIndexViewTestCase(
         self.assertVisibleBookmarks(response, visible_bookmarks)
         self.assertInvisibleBookmarks(response, invisible_bookmarks)
 
+    def test_global_scope_search_returns_bookmarks_outside_selected_bundle(self):
+        bundle_bookmarks = self.setup_numbered_bookmarks(2, prefix="foo")
+        other_bookmarks = self.setup_numbered_bookmarks(2, prefix="bar")
+
+        bundle = self.setup_bundle(search="foo")
+
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&q=bar&scope={BookmarkSearch.SCOPE_ALL}"
+        )
+
+        self.assertVisibleBookmarks(response, other_bookmarks)
+        self.assertInvisibleBookmarks(response, bundle_bookmarks)
+
+    def test_bundle_scoped_search_ignores_bookmarks_outside_bundle(self):
+        bundle_bookmarks = self.setup_numbered_bookmarks(2, prefix="foo")
+        other_bookmarks = self.setup_numbered_bookmarks(2, prefix="bar")
+
+        bundle = self.setup_bundle(search="foo")
+
+        # without a scope param, the search stays scoped to the bundle
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}&q=bar"
+        )
+
+        self.assertInvisibleBookmarks(response, bundle_bookmarks + other_bookmarks)
+
+        # without a query, the bundle's bookmarks are listed
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+
+        self.assertVisibleBookmarks(response, bundle_bookmarks)
+        self.assertInvisibleBookmarks(response, other_bookmarks)
+
     def test_should_list_tags_for_unarchived_and_user_owned_bookmarks(self):
         other_user = User.objects.create_user(
             "otheruser", "otheruser@example.com", "password123"

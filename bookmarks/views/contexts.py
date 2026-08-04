@@ -221,6 +221,12 @@ class BookmarkListContext:
         self.bookmarks_page = bookmarks_page
         self.bookmarks_total = paginator.count
 
+        # Empty state details, see empty_bookmarks.html
+        self.has_filters = search.has_filters
+        self.bundle = search.bundle
+        self.show_global_search_hint = search.applies_bundle_filter
+        self.scope_all_url = utils.scope_url(request, BookmarkSearch.SCOPE_ALL)
+
         self.return_url = request_context.index()
         self.action_url = request_context.action()
 
