@@ -1310,6 +1310,83 @@ class QueriesBasicTestCase(TestCase, BookmarkFactoryMixin):
         )
         self.assertQueryResult(query, [matching_bookmarks])
 
+    def test_query_bookmarks_with_bundle_search_or_operator(self):
+        bundle = self.setup_bundle(search="alpha or beta")
+
+        matching_bookmarks = [
+            self.setup_bookmark(title="alpha content"),
+            self.setup_bookmark(title="beta content"),
+        ]
+
+        # Bookmarks that should not match
+        self.setup_bookmark(title="gamma content")
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="", bundle=bundle)
+        )
+        self.assertQueryResult(query, [matching_bookmarks])
+
+    def test_query_bookmarks_with_bundle_search_not_operator(self):
+        bundle = self.setup_bundle(search="python and not deprecated")
+
+        matching_bookmarks = [
+            self.setup_bookmark(title="Python Tutorial"),
+        ]
+
+        # Bookmarks that should not match
+        self.setup_bookmark(title="Old Python Guide", description="deprecated")
+        self.setup_bookmark(title="Java Guide")
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="", bundle=bundle)
+        )
+        self.assertQueryResult(query, [matching_bookmarks])
+
+    def test_query_bookmarks_with_bundle_search_grouping(self):
+        bundle = self.setup_bundle(search="(alpha or beta) and tutorial")
+
+        matching_bookmarks = [
+            self.setup_bookmark(title="alpha tutorial"),
+            self.setup_bookmark(title="beta tutorial"),
+        ]
+
+        # Bookmarks that should not match
+        self.setup_bookmark(title="alpha content")
+        self.setup_bookmark(title="gamma tutorial")
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="", bundle=bundle)
+        )
+        self.assertQueryResult(query, [matching_bookmarks])
+
+    def test_query_bookmarks_with_bundle_search_quoted_phrase(self):
+        bundle = self.setup_bundle(search='"web development" or tutorial')
+
+        matching_bookmarks = [
+            self.setup_bookmark(title="Web Development with React"),
+            self.setup_bookmark(title="Python Tutorial"),
+        ]
+
+        # Bookmarks that should not match (contains words separately, not the phrase)
+        self.setup_bookmark(title="web tools", description="development notes")
+        self.setup_bookmark(title="unrelated content")
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="", bundle=bundle)
+        )
+        self.assertQueryResult(query, [matching_bookmarks])
+
+    def test_query_bookmarks_with_bundle_search_unparseable_returns_no_results(self):
+        bundle = self.setup_bundle(search="(python and tutorial")
+
+        self.setup_bookmark(title="Python Tutorial")
+        self.setup_bookmark(title="unrelated content")
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="", bundle=bundle)
+        )
+        self.assertCountEqual(list(query), [])
+
     def test_query_bookmarks_with_search_and_bundle_search_terms(self):
         bundle = self.setup_bundle(search="bundle_term_B")
         search = BookmarkSearch(q="search_term_A", bundle=bundle)
