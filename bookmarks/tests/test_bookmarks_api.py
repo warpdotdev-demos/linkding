@@ -152,6 +152,80 @@ class BookmarksApiTestCase(LinkdingApiTestCase, BookmarkFactoryMixin):
         )
         self.assertBookmarkListEqual(response.data["results"], bookmarks)
 
+    def test_list_bookmarks_with_bundle_is_unchanged(self):
+        self.authenticate()
+        bundle_bookmarks = self.setup_numbered_bookmarks(2, prefix="foo")
+        self.setup_numbered_bookmarks(2, prefix="bar")
+        bundle = self.setup_bundle(search="foo")
+
+        # without a scope param the bundle filter is applied as before
+        response = self.get(
+            reverse("linkding:bookmark-list") + f"?bundle={bundle.id}",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], bundle_bookmarks)
+
+        response = self.get(
+            reverse("linkding:bookmark-list") + f"?bundle={bundle.id}&q=bar",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], [])
+
+    def test_list_bookmarks_with_bundle_and_global_scope(self):
+        self.authenticate()
+        self.setup_numbered_bookmarks(2, prefix="foo")
+        other_bookmarks = self.setup_numbered_bookmarks(2, prefix="bar")
+        bundle = self.setup_bundle(search="foo")
+
+        response = self.get(
+            reverse("linkding:bookmark-list") + f"?bundle={bundle.id}&q=bar&scope=all",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], other_bookmarks)
+
+    def test_list_archived_bookmarks_with_bundle_and_global_scope(self):
+        self.authenticate()
+        self.setup_numbered_bookmarks(2, prefix="foo", archived=True)
+        other_bookmarks = self.setup_numbered_bookmarks(2, prefix="bar", archived=True)
+        bundle = self.setup_bundle(search="foo")
+
+        # unchanged without the scope param
+        response = self.get(
+            reverse("linkding:bookmark-archived") + f"?bundle={bundle.id}&q=bar",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], [])
+
+        response = self.get(
+            reverse("linkding:bookmark-archived")
+            + f"?bundle={bundle.id}&q=bar&scope=all",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], other_bookmarks)
+
+    def test_list_shared_bookmarks_with_bundle_and_global_scope(self):
+        self.authenticate()
+        user = self.setup_user(enable_sharing=True)
+        self.setup_numbered_bookmarks(2, prefix="foo", shared=True, user=user)
+        other_bookmarks = self.setup_numbered_bookmarks(
+            2, prefix="bar", shared=True, user=user
+        )
+        bundle = self.setup_bundle(search="foo")
+
+        # unchanged without the scope param
+        response = self.get(
+            reverse("linkding:bookmark-shared") + f"?bundle={bundle.id}&q=bar",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], [])
+
+        response = self.get(
+            reverse("linkding:bookmark-shared")
+            + f"?bundle={bundle.id}&q=bar&scope=all",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], other_bookmarks)
+
     def test_list_bookmarks_filter_unread(self):
         self.authenticate()
         unread_bookmarks = self.setup_numbered_bookmarks(5, unread=True)

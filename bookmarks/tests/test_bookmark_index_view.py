@@ -86,6 +86,109 @@ class BookmarkIndexViewTestCase(
         self.assertVisibleBookmarks(response, visible_bookmarks)
         self.assertInvisibleBookmarks(response, invisible_bookmarks)
 
+    def test_global_scope_search_returns_bookmarks_outside_selected_bundle(self):
+        bundle_bookmarks = self.setup_numbered_bookmarks(2, prefix="foo")
+        other_bookmarks = self.setup_numbered_bookmarks(2, prefix="bar")
+
+        bundle = self.setup_bundle(search="foo")
+
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&q=bar&scope={BookmarkSearch.SCOPE_ALL}"
+        )
+
+        self.assertVisibleBookmarks(response, other_bookmarks)
+        self.assertInvisibleBookmarks(response, bundle_bookmarks)
+
+    def test_bundle_scoped_search_ignores_bookmarks_outside_bundle(self):
+        bundle_bookmarks = self.setup_numbered_bookmarks(2, prefix="foo")
+        other_bookmarks = self.setup_numbered_bookmarks(2, prefix="bar")
+
+        bundle = self.setup_bundle(search="foo")
+
+        # without a scope param, the search stays scoped to the bundle
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}&q=bar"
+        )
+
+        self.assertInvisibleBookmarks(response, bundle_bookmarks + other_bookmarks)
+
+        # without a query, the bundle's bookmarks are listed
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+
+        self.assertVisibleBookmarks(response, bundle_bookmarks)
+        self.assertInvisibleBookmarks(response, other_bookmarks)
+
+    def test_global_scope_keeps_bundle_selected_in_side_panel(self):
+        self.setup_numbered_bookmarks(2, prefix="foo")
+        self.setup_numbered_bookmarks(2, prefix="bar")
+
+        bundle = self.setup_bundle(search="foo")
+
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&q=bar&scope={BookmarkSearch.SCOPE_ALL}"
+        )
+        soup = self.make_soup(response.content.decode())
+
+        # the bundle is still rendered as selected
+        selected_bundle = soup.select_one("li.bundle-menu-item.selected")
+        self.assertIsNotNone(selected_bundle)
+        self.assertEqual(selected_bundle.text.strip(), bundle.name)
+
+        # and the search bar keeps both the bundle and the scope
+        search_form = soup.select_one("form#search")
+        self.assertEqual(
+            search_form.select_one('input[name="bundle"][type="hidden"]')["value"],
+            str(bundle.id),
+        )
+        self.assertEqual(
+            search_form.select_one('input[name="scope"][type="hidden"]')["value"],
+            BookmarkSearch.SCOPE_ALL,
+        )
+
+    def test_tag_cloud_follows_global_scope(self):
+        bundle_bookmarks = self.setup_numbered_bookmarks(
+            2, with_tags=True, prefix="foo", tag_prefix="foo"
+        )
+        other_bookmarks = self.setup_numbered_bookmarks(
+            2, with_tags=True, prefix="bar", tag_prefix="bar"
+        )
+
+        bundle_tags = self.get_tags_from_bookmarks(bundle_bookmarks)
+        other_tags = self.get_tags_from_bookmarks(other_bookmarks)
+
+        bundle = self.setup_bundle(search="foo")
+
+        # in global scope, the tag cloud lists the widened result set's tags
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&q=bar&scope={BookmarkSearch.SCOPE_ALL}"
+        )
+        self.assertVisibleTags(response, other_tags)
+        self.assertInvisibleTags(response, bundle_tags)
+
+        # in bundle scope, it does not
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}&q=bar"
+        )
+        self.assertInvisibleTags(response, bundle_tags + other_tags)
+
+    def test_bulk_action_url_carries_scope(self):
+        bundle = self.setup_bundle(search="foo")
+
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&q=bar&scope={BookmarkSearch.SCOPE_ALL}"
+        )
+
+        self.assertBulkActionForm(
+            response,
+            f"/bookmarks/action?bundle={bundle.id}&q=bar&scope={BookmarkSearch.SCOPE_ALL}",
+        )
+
     def test_should_list_tags_for_unarchived_and_user_owned_bookmarks(self):
         other_user = User.objects.create_user(
             "otheruser", "otheruser@example.com", "password123"

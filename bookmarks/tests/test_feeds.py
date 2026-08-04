@@ -382,6 +382,26 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
         self.assertEqual(response.status_code, 200)
         self.assertFeedItems(response, visible_bookmarks)
 
+    def test_feed_ignores_scope_param(self):
+        tag1 = self.setup_tag()
+        visible_bookmarks = [
+            self.setup_bookmark(tags=[tag1]),
+            self.setup_bookmark(tags=[tag1]),
+        ]
+
+        self.setup_bookmark()
+        self.setup_bookmark()
+
+        bundle = self.setup_bundle(all_tags=tag1.name)
+
+        # feeds build their search explicitly, so scope has no effect
+        response = self.client.get(
+            reverse("linkding:feeds.all", args=[self.token.key])
+            + f"?bundle={bundle.id}&scope=all"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFeedItems(response, visible_bookmarks)
+
     def test_with_bundle_not_owned_by_user(self):
         other_user = User.objects.create_user(
             "otheruser", "otheruser@example.com", "password123"

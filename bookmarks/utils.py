@@ -140,6 +140,25 @@ def parse_timestamp(value: str):
     raise ValueError(f"{value} exceeds maximum value for a timestamp")
 
 
+def scope_url(request, scope: str | None) -> str:
+    """Builds a URL for the current view with the given search scope applied.
+
+    Preserves all other query params so that the current search is kept, and
+    drops params that must not survive a scope change. Passing no scope returns
+    a URL for the default (bundle) scope.
+    """
+    query_params = request.GET.copy()
+    query_params.pop("page", None)
+    query_params.pop("details", None)
+    if scope:
+        query_params["scope"] = scope
+    else:
+        query_params.pop("scope", None)
+
+    encoded_params = query_params.urlencode()
+    return f"{request.path}?{encoded_params}" if encoded_params else request.path
+
+
 def get_safe_return_url(return_url: str, fallback_url: str):
     # Use fallback if URL is none or URL is not on same domain
     if not return_url or not re.match(r"^/[a-z]+", return_url):

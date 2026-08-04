@@ -863,6 +863,26 @@ class BookmarkActionViewTestCase(
         self.assertEqual(0, Bookmark.objects.filter(title__startswith="foo").count())
         self.assertEqual(3, Bookmark.objects.filter(title__startswith="bar").count())
 
+    def test_bulk_action_with_global_scope_applies_to_widened_query(self):
+        self.setup_numbered_bookmarks(3, prefix="foo")
+        self.setup_numbered_bookmarks(3, prefix="bar")
+
+        bundle = self.setup_bundle(search="foo")
+
+        self.client.post(
+            reverse("linkding:bookmarks.index.action")
+            + f"?bundle={bundle.id}&q=bar&scope=all",
+            {
+                "bulk_action": ["bulk_delete"],
+                "bulk_execute": [""],
+                "bulk_select_across": ["on"],
+            },
+        )
+
+        # the bookmarks outside the bundle are affected, the bundle's are not
+        self.assertEqual(0, Bookmark.objects.filter(title__startswith="bar").count())
+        self.assertEqual(3, Bookmark.objects.filter(title__startswith="foo").count())
+
     def test_archived_action_bulk_select_across_only_affects_archived_bookmarks(self):
         self.setup_bulk_edit_scope_test_data()
 

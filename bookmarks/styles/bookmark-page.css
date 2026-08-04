@@ -48,6 +48,8 @@
 .bookmarks-page .search-container {
   flex: 1 1 0;
   display: flex;
+  flex-direction: column;
+  gap: var(--unit-1);
   max-width: 300px;
   margin-left: auto;
 
@@ -61,9 +63,37 @@
   }
 
   /* Group search options button with search button */
-  height: var(--control-size);
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow-xs);
+  & .search-input-group {
+    display: flex;
+    height: var(--control-size);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow-xs);
+  }
+
+  /* Search scope control */
+  & .search-scope {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--unit-2);
+    font-size: var(--font-size-sm);
+
+    & .scope-label {
+      max-width: 55%;
+      padding: 0 var(--unit-1);
+      border-radius: var(--border-radius);
+      background: var(--primary-color);
+      color: var(--contrast-text-color);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    & .scope-action,
+    & .scope-action:visited:hover {
+      color: var(--alternative-color);
+    }
+  }
 
   & input,
   & .form-autocomplete-input {

@@ -94,3 +94,16 @@ class BookmarkSearchFormTest(TestCase, BookmarkFactoryMixin):
         )
         form = BookmarkSearchForm(search, editable_fields=["q", "user"])
         self.assertCountEqual(form.hidden_fields(), [form["sort"]])
+
+    def test_scope_is_rendered_as_hidden_field_when_modified(self):
+        search = BookmarkSearch(scope=BookmarkSearch.SCOPE_ALL)
+        form = BookmarkSearchForm(search, editable_fields=["q"])
+
+        self.assertIn(form["scope"], form.hidden_fields())
+        self.assertEqual(form["scope"].initial, BookmarkSearch.SCOPE_ALL)
+
+    def test_scope_is_not_rendered_when_default(self):
+        search = BookmarkSearch(scope=BookmarkSearch.SCOPE_BUNDLE)
+        form = BookmarkSearchForm(search, editable_fields=["q"])
+
+        self.assertNotIn(form["scope"], form.hidden_fields())
