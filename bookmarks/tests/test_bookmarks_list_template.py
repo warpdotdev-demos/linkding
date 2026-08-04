@@ -240,6 +240,14 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
             count=count,
         )
 
+    def assertUnreadChipCount(self, html: str, count=1):
+        soup = self.make_soup(html)
+        chips = soup.select("ul.bookmark-list > li .title .unread-chip")
+
+        self.assertEqual(len(chips), count)
+        for chip in chips:
+            self.assertEqual(chip.text.strip(), "Unread")
+
     def assertMarkAsReadButton(self, html: str, bookmark: Bookmark, count=1):
         self.assertInHTML(
             f"""
@@ -612,6 +620,18 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         list_item = soup.select_one("ul.bookmark-list > li")
         self.assertIsNotNone(list_item)
         self.assertListEqual(["unread"], list_item["class"])
+
+    def test_should_render_unread_chip_next_to_title_for_unread_bookmark(self):
+        self.setup_bookmark(unread=True)
+        html = self.render_template()
+
+        self.assertUnreadChipCount(html, count=1)
+
+    def test_should_not_render_unread_chip_for_read_bookmark(self):
+        self.setup_bookmark(unread=False)
+        html = self.render_template()
+
+        self.assertUnreadChipCount(html, count=0)
 
     def test_should_reflect_shared_state_as_css_class(self):
         profile = self.get_or_create_test_user().profile
