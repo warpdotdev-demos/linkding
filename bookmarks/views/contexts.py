@@ -21,6 +21,7 @@ from bookmarks.models import (
 from bookmarks.services.search_query_parser import (
     OrExpression,
     SearchQueryParseError,
+    format_tag_for_query,
     parse_search_query,
     strip_tag_from_query,
 )
@@ -316,7 +317,9 @@ class AddTagItem:
         if isinstance(context.search_expression, OrExpression):
             # If the current search expression is an OR expression, wrap in parentheses
             query_with_tag = f"({query_with_tag})"
-        query_with_tag = f"{query_with_tag} #{tag.name}".strip()
+        # Quote the tag name if needed, so that names containing characters that
+        # are meaningful to the search query parser round-trip correctly
+        query_with_tag = f"{query_with_tag} {format_tag_for_query(tag.name)}".strip()
 
         params["q"] = query_with_tag
         params.pop("details", None)

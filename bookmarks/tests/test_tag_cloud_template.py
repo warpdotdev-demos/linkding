@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 from django.contrib.auth.models import AnonymousUser, User
 from django.http import HttpResponse
 from django.template import RequestContext, Template
@@ -5,6 +7,7 @@ from django.test import RequestFactory, TestCase
 
 from bookmarks.middlewares import LinkdingMiddleware
 from bookmarks.models import BookmarkSearch, UserProfile
+from bookmarks.services.search_query_parser import extract_tag_names_from_query
 from bookmarks.tests.helpers import BookmarkFactoryMixin, HtmlTestMixin
 from bookmarks.views import contexts
 
@@ -479,6 +482,42 @@ class TagCloudTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
             <a href="?q=term1+term2&sort=title_asc"
                class="text-bold mr-2">
                 <span>-tag1</span>
+            </a>
+        """,
+            rendered_template,
+        )
+
+    def test_tag_link_query_string_round_trips_names_with_parentheses(self):
+        # Clicking a tag must produce a query string that resolves back to that
+        # exact tag, also for names containing parentheses
+        tag_names = ["hello(world)", "foo)bar", "a(b(c))", "normal"]
+        for tag_name in tag_names:
+            self.setup_bookmark(tags=[self.setup_tag(name=tag_name)])
+
+        rendered_template = self.render_template()
+        soup = self.make_soup(rendered_template)
+        tag_links = {
+            link.text.strip(): link["href"] for link in soup.select("p.group a")
+        }
+        self.assertCountEqual(tag_links.keys(), tag_names)
+
+        for tag_name in tag_names:
+            with self.subTest(tag_name=tag_name):
+                query = parse_qs(urlparse(tag_links[tag_name]).query)["q"][0]
+                self.assertEqual(extract_tag_names_from_query(query), [tag_name])
+
+    def test_selected_tag_with_parentheses_can_be_removed(self):
+        tag = self.setup_tag(name="hello(world)")
+        self.setup_bookmark(tags=[tag])
+
+        rendered_template = self.render_template(url="/test?q=%23hello(world)")
+
+        self.assertNumSelectedTags(rendered_template, 1)
+        self.assertInHTML(
+            """
+            <a href="?q="
+               class="text-bold mr-2">
+                <span>-hello(world)</span>
             </a>
         """,
             rendered_template,

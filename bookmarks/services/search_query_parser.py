@@ -29,32 +29,82 @@ class SearchQueryTokenizer:
         self.position = 0
         self.current_char = self.query[0] if self.query else None
 
-    def advance(self):
-        """Move to the next character in the query."""
-        self.position += 1
+    def seek(self, position: int):
+        """Move to a specific character in the query."""
+        self.position = position
         if self.position >= len(self.query):
             self.current_char = None
         else:
             self.current_char = self.query[self.position]
+
+    def advance(self):
+        """Move to the next character in the query."""
+        self.seek(self.position + 1)
 
     def skip_whitespace(self):
         """Skip whitespace characters."""
         while self.current_char and self.current_char.isspace():
             self.advance()
 
-    def read_term(self) -> str:
-        """Read a search term (sequence of non-whitespace, non-special characters)."""
-        term = ""
+    def read_balanced_parens(self) -> str | None:
+        """Read a balanced parenthesized run that is part of a tag or term.
+
+        Expects the current character to be an opening parenthesis. Returns the
+        consumed text, for example "(world)" while reading the tag
+        "hello(world)". Returns None, without consuming anything, when the
+        parentheses are not balanced before the end of the token (whitespace or
+        end of query) - in that case the parenthesis opens a group instead.
+        """
+        depth = 0
+        lookahead = self.position
+
+        while lookahead < len(self.query):
+            char = self.query[lookahead]
+            if char.isspace():
+                break
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    content = self.query[self.position : lookahead + 1]
+                    self.seek(lookahead + 1)
+                    return content
+            lookahead += 1
+
+        return None
+
+    def read_token_value(self, stop_chars: str) -> str:
+        """Read a tag or term value, keeping parentheses that belong to it.
+
+        Parentheses are only part of the value when they form a balanced pair
+        within the token, so that grouping parentheses keep working.
+        """
+        value = ""
 
         while (
             self.current_char
             and not self.current_char.isspace()
-            and self.current_char not in "()\"'#!"
+            and self.current_char not in stop_chars
         ):
-            term += self.current_char
-            self.advance()
+            if self.current_char == "(":
+                parens = self.read_balanced_parens()
+                if parens is None:
+                    # Unbalanced - the parenthesis opens a group instead
+                    break
+                value += parens
+            elif self.current_char == ")":
+                # Closes a group, so it does not belong to the value
+                break
+            else:
+                value += self.current_char
+                self.advance()
 
-        return term
+        return value
+
+    def read_term(self) -> str:
+        """Read a search term (sequence of non-whitespace, non-special characters)."""
+        return self.read_token_value("\"'#!")
 
     def read_quoted_string(self, quote_char: str) -> str:
         """Read a quoted string, handling escaped quotes."""
@@ -95,18 +145,15 @@ class SearchQueryTokenizer:
 
     def read_tag(self) -> str:
         """Read a tag (starts with # and continues until whitespace or special chars)."""
-        tag = ""
         self.advance()  # skip the # character
 
-        while (
-            self.current_char
-            and not self.current_char.isspace()
-            and self.current_char not in "()\"'"
-        ):
-            tag += self.current_char
-            self.advance()
+        if self.current_char and self.current_char in "\"'":
+            # Quoted tag, e.g. #"hello (world)" - the escape hatch for names
+            # that cannot be read unambiguously, such as names containing
+            # whitespace or unbalanced parentheses
+            return self.read_quoted_string(self.current_char)
 
-        return tag
+        return self.read_token_value("\"'")
 
     def read_special_keyword(self) -> str:
         """Read a special keyword (starts with ! and continues until whitespace or special chars)."""
@@ -350,6 +397,44 @@ def _is_simple_expression(expr: SearchExpression) -> bool:
     return isinstance(expr, (TermExpression, TagExpression, SpecialKeywordExpression))
 
 
+def _has_balanced_parens(value: str) -> bool:
+    depth = 0
+    for char in value:
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+
+    return depth == 0
+
+
+def _tag_needs_quotes(tag: str) -> bool:
+    """Check if a tag name must be quoted to survive parsing it again.
+
+    Balanced parentheses are read back as part of the tag name, so a tag such
+    as "hello(world)" stays readable without quotes.
+    """
+    if not tag:
+        return True
+    if any(char.isspace() for char in tag):
+        return True
+    if any(char in tag for char in "\"'"):
+        return True
+
+    return not _has_balanced_parens(tag)
+
+
+def format_tag_for_query(tag_name: str) -> str:
+    """Render a tag name as a search query fragment, quoting it when needed."""
+    if _tag_needs_quotes(tag_name):
+        escaped = tag_name.replace("\\", "\\\\").replace('"', '\\"')
+        return f'#"{escaped}"'
+
+    return f"#{tag_name}"
+
+
 def _expression_to_string(expr: SearchExpression, parent_type: type = None) -> str:
     if isinstance(expr, TermExpression):
         # Quote terms if they contain spaces or special characters
@@ -360,7 +445,7 @@ def _expression_to_string(expr: SearchExpression, parent_type: type = None) -> s
         return expr.term
 
     elif isinstance(expr, TagExpression):
-        return f"#{expr.tag}"
+        return format_tag_for_query(expr.tag)
 
     elif isinstance(expr, SpecialKeywordExpression):
         return f"!{expr.keyword}"

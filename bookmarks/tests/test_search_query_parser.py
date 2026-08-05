@@ -14,6 +14,7 @@ from bookmarks.services.search_query_parser import (
     TokenType,
     expression_to_string,
     extract_tag_names_from_query,
+    format_tag_for_query,
     parse_search_query,
     strip_tag_from_query,
 )
@@ -1275,3 +1276,181 @@ class ExtractTagNamesFromQueryLaxSearchTest(TestCase):
     def test_no_profile_defaults_to_strict(self):
         result = extract_tag_names_from_query("python #django", None)
         self.assertEqual(result, ["django"])
+
+
+class ParenthesesInTagsAndTermsTest(TestCase):
+    """Tags and terms may contain parentheses as part of their name.
+
+    Parentheses that are balanced within a single token belong to the tag or
+    term, while parentheses used for grouping keep working as operators.
+    """
+
+    def setUp(self):
+        self.lax_profile = type(
+            "UserProfile", (), {"tag_search": UserProfile.TAG_SEARCH_LAX}
+        )()
+
+    def test_tokenize_tag_with_parentheses(self):
+        tokenizer = SearchQueryTokenizer("#hello(world)")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0].type, TokenType.TAG)
+        self.assertEqual(tokens[0].value, "hello(world)")
+        self.assertEqual(tokens[1].type, TokenType.EOF)
+
+    def test_tokenize_term_with_parentheses(self):
+        tokenizer = SearchQueryTokenizer("hello(world)")
+        tokens = tokenizer.tokenize()
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0].type, TokenType.TERM)
+        self.assertEqual(tokens[0].value, "hello(world)")
+        self.assertEqual(tokens[1].type, TokenType.EOF)
+
+    def test_parse_tag_with_parentheses(self):
+        result = parse_search_query("#hello(world)")
+        self.assertEqual(result, _tag("hello(world)"))
+
+    def test_parse_term_with_parentheses(self):
+        result = parse_search_query("hello(world)")
+        self.assertEqual(result, _term("hello(world)"))
+
+    def test_parse_tag_with_nested_parentheses(self):
+        result = parse_search_query("#a(b(c))")
+        self.assertEqual(result, _tag("a(b(c))"))
+
+    def test_parse_tag_enclosed_in_parentheses(self):
+        result = parse_search_query("#(world)")
+        self.assertEqual(result, _tag("(world)"))
+
+    def test_parse_tag_with_parentheses_and_other_tags(self):
+        result = parse_search_query("#hello(world) #python")
+        self.assertEqual(result, _and(_tag("hello(world)"), _tag("python")))
+
+        result = parse_search_query("#hello(world) or #python")
+        self.assertEqual(result, _or(_tag("hello(world)"), _tag("python")))
+
+        result = parse_search_query("not #hello(world)")
+        self.assertEqual(result, _not(_tag("hello(world)")))
+
+    def test_parse_quoted_tag(self):
+        # Quoting is the escape hatch for names the tokenizer cannot infer
+        result = parse_search_query('#"hello(world)"')
+        self.assertEqual(result, _tag("hello(world)"))
+
+        result = parse_search_query('#"foo)bar"')
+        self.assertEqual(result, _tag("foo)bar"))
+
+        result = parse_search_query('#"hello world"')
+        self.assertEqual(result, _tag("hello world"))
+
+        result = parse_search_query("#'hello world'")
+        self.assertEqual(result, _tag("hello world"))
+
+    def test_parse_quoted_tag_with_operators(self):
+        result = parse_search_query('#"hello(world)" or #python')
+        self.assertEqual(result, _or(_tag("hello(world)"), _tag("python")))
+
+        result = parse_search_query('(#"hello(world)" or #python) #tutorial')
+        self.assertEqual(
+            result,
+            _and(_or(_tag("hello(world)"), _tag("python")), _tag("tutorial")),
+        )
+
+    def test_empty_quoted_tag_ignored(self):
+        result = parse_search_query('#""')
+        self.assertIsNone(result)
+
+    def test_grouping_still_works(self):
+        test_cases = [
+            ("(#a or #b) #c", _and(_or(_tag("a"), _tag("b")), _tag("c"))),
+            ("not (#a or #b)", _not(_or(_tag("a"), _tag("b")))),
+            (
+                "(programming or books) and streaming",
+                _and(_or(_term("programming"), _term("books")), _term("streaming")),
+            ),
+            ("#a (b or c)", _and(_tag("a"), _or(_term("b"), _term("c")))),
+            (
+                "books (python or ruby)",
+                _and(_term("books"), _or(_term("python"), _term("ruby"))),
+            ),
+            # Parentheses that cannot be balanced within the token still group
+            ("#a(b or c)", _and(_tag("a"), _or(_term("b"), _term("c")))),
+            ("a(b or c)", _and(_term("a"), _or(_term("b"), _term("c")))),
+        ]
+
+        for query, expected_ast in test_cases:
+            with self.subTest(query=query):
+                self.assertEqual(parse_search_query(query), expected_ast)
+
+    def test_unbalanced_parentheses_still_raise(self):
+        for query in [
+            "(programming and books",
+            "programming and books)",
+            "#hello(world",
+        ]:
+            with self.subTest(query=query), self.assertRaises(SearchQueryParseError):
+                parse_search_query(query)
+
+    def test_format_tag_for_query(self):
+        self.assertEqual(format_tag_for_query("python"), "#python")
+        self.assertEqual(format_tag_for_query("hello(world)"), "#hello(world)")
+        self.assertEqual(format_tag_for_query("a(b(c))"), "#a(b(c))")
+        self.assertEqual(format_tag_for_query("foo)bar"), '#"foo)bar"')
+        self.assertEqual(format_tag_for_query("foo(bar"), '#"foo(bar"')
+        self.assertEqual(format_tag_for_query("hello world"), '#"hello world"')
+        self.assertEqual(format_tag_for_query('say "hi"'), '#"say \\"hi\\""')
+
+    def test_expression_to_string_quotes_tags_when_needed(self):
+        self.assertEqual(expression_to_string(_tag("hello(world)")), "#hello(world)")
+        self.assertEqual(expression_to_string(_tag("foo)bar")), '#"foo)bar"')
+        self.assertEqual(
+            expression_to_string(_and(_tag("hello(world)"), _term("guide"))),
+            "#hello(world) guide",
+        )
+
+    def test_round_trip(self):
+        test_cases = [
+            "#hello(world)",
+            "#hello(world) #python",
+            "#hello(world) or #python",
+            "#a(b(c))",
+            '#"foo)bar"',
+            '#"hello world"',
+            "(#a or #b) #c",
+            "not (#a or #b)",
+        ]
+
+        for query in test_cases:
+            with self.subTest(query=query):
+                ast = parse_search_query(query)
+                ast2 = parse_search_query(expression_to_string(ast))
+                self.assertEqual(ast, ast2)
+
+    def test_strip_tag_from_query(self):
+        result = strip_tag_from_query("#hello(world)", "hello(world)")
+        self.assertEqual(result, "")
+
+        result = strip_tag_from_query("#hello(world) #python", "hello(world)")
+        self.assertEqual(result, "#python")
+
+        result = strip_tag_from_query("#hello(world) #python", "python")
+        self.assertEqual(result, "#hello(world)")
+
+        result = strip_tag_from_query('#"foo)bar" #python', "foo)bar")
+        self.assertEqual(result, "#python")
+
+    def test_strip_tag_from_query_lax_search(self):
+        result = strip_tag_from_query(
+            "hello(world) #python", "hello(world)", self.lax_profile
+        )
+        self.assertEqual(result, "#python")
+
+    def test_extract_tag_names_from_query(self):
+        result = extract_tag_names_from_query("#hello(world) #python")
+        self.assertEqual(result, ["hello(world)", "python"])
+
+        result = extract_tag_names_from_query('#"foo)bar"')
+        self.assertEqual(result, ["foo)bar"])
+
+        result = extract_tag_names_from_query("hello(world)", self.lax_profile)
+        self.assertEqual(result, ["hello(world)"])
