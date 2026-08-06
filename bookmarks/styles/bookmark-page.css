@@ -184,6 +184,9 @@ ul.bookmark-list {
 
     & .title {
       position: relative;
+      display: flex;
+      align-items: center;
+      column-gap: var(--unit-1);
     }
 
     & .title img {
@@ -204,10 +207,24 @@ ul.bookmark-list {
       color: var(--bookmark-title-color);
       font-weight: var(--bookmark-title-weight);
       display: block;
-      width: 100%;
+      flex: 0 1 auto;
+      min-width: 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    & .title .unread-chip {
+      flex: 0 0 auto;
+      padding: 0 var(--unit-1);
+      border: solid 1px var(--alternative-color);
+      border-radius: var(--border-radius);
+      color: var(--alternative-color);
+      font-size: var(--font-size-sm);
+      font-weight: 400;
+      font-style: normal;
+      line-height: 1.4;
+      white-space: nowrap;
     }
 
     & .title a[data-tooltip]:hover::after,

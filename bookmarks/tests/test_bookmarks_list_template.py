@@ -256,6 +256,14 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
             count=count,
         )
 
+    def assertUnreadChip(self, html: str, count=1):
+        soup = self.make_soup(html)
+        chips = soup.select("ul.bookmark-list > li .title .unread-chip")
+
+        self.assertEqual(len(chips), count)
+        for chip in chips:
+            self.assertEqual("Unread", chip.text.strip())
+
     def render_template(
         self,
         url="/bookmarks",
@@ -638,6 +646,26 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         list_item = soup.select_one("ul.bookmark-list > li")
         self.assertIsNotNone(list_item)
         self.assertListEqual(["unread", "shared"], list_item["class"])
+
+    def test_should_show_unread_chip_for_unread_bookmarks(self):
+        self.setup_bookmark(unread=True)
+        html = self.render_template()
+
+        self.assertUnreadChip(html, count=1)
+
+    def test_should_not_show_unread_chip_for_read_bookmarks(self):
+        self.setup_bookmark(unread=False)
+        html = self.render_template()
+
+        self.assertUnreadChip(html, count=0)
+
+    def test_should_show_unread_chip_for_non_owned_bookmarks(self):
+        other_user = self.setup_user(enable_sharing=True)
+
+        self.setup_bookmark(user=other_user, shared=True, unread=True)
+        html = self.render_template(context_type=contexts.SharedBookmarkListContext)
+
+        self.assertUnreadChip(html, count=1)
 
     def test_show_bookmark_actions_for_owned_bookmarks(self):
         bookmark = self.setup_bookmark()
