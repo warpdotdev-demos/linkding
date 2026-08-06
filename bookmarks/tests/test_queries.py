@@ -1880,6 +1880,109 @@ class GetTagsForQueryTestCase(TestCase, BookmarkFactoryMixin):
         self.assertCountEqual(list(result), [])
 
 
+class QueriesParenthesizedTagsTestCase(TestCase, BookmarkFactoryMixin):
+    """Tags whose name contains parentheses must be searchable."""
+
+    def setUp(self):
+        self.user = self.get_or_create_test_user()
+        self.profile = self.user.profile
+
+        self.paren_tag = self.setup_tag(name="hello(world)")
+        self.normal_tag = self.setup_tag(name="normal")
+        self.a_tag = self.setup_tag(name="a")
+        self.b_tag = self.setup_tag(name="b")
+
+        self.paren_bookmark = self.setup_bookmark(
+            title="Hello world bookmark", tags=[self.paren_tag]
+        )
+        self.normal_bookmark = self.setup_bookmark(
+            title="Normal bookmark", tags=[self.normal_tag]
+        )
+        self.a_bookmark = self.setup_bookmark(title="A bookmark", tags=[self.a_tag])
+        self.b_bookmark = self.setup_bookmark(title="B bookmark", tags=[self.b_tag])
+
+    def enable_lax_search(self):
+        self.profile.tag_search = UserProfile.TAG_SEARCH_LAX
+        self.profile.save()
+
+    def test_strict_tag_search_finds_tag_with_parentheses(self):
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#hello(world)")
+        )
+        self.assertCountEqual(list(query), [self.paren_bookmark])
+
+    def test_lax_tag_search_finds_tag_with_parentheses(self):
+        self.enable_lax_search()
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="hello(world)")
+        )
+        self.assertCountEqual(list(query), [self.paren_bookmark])
+
+    def test_quoted_tag_search_finds_tag_with_parentheses(self):
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q='#"hello(world)"')
+        )
+        self.assertCountEqual(list(query), [self.paren_bookmark])
+
+    def test_tag_with_unbalanced_parenthesis_is_searchable_when_quoted(self):
+        unbalanced_tag = self.setup_tag(name="foo)bar")
+        unbalanced_bookmark = self.setup_bookmark(tags=[unbalanced_tag])
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q='#"foo)bar"')
+        )
+        self.assertCountEqual(list(query), [unbalanced_bookmark])
+
+    def test_tag_with_parentheses_combined_with_operators(self):
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#hello(world) or #normal")
+        )
+        self.assertCountEqual(list(query), [self.paren_bookmark, self.normal_bookmark])
+
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(q="(#hello(world) or #normal) and not #normal"),
+        )
+        self.assertCountEqual(list(query), [self.paren_bookmark])
+
+    def test_normal_tag_search_is_unaffected(self):
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#normal")
+        )
+        self.assertCountEqual(list(query), [self.normal_bookmark])
+
+        self.enable_lax_search()
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="normal")
+        )
+        self.assertCountEqual(list(query), [self.normal_bookmark])
+
+    def test_boolean_and_grouped_search_is_unaffected(self):
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="#normal or #nope")
+        )
+        self.assertCountEqual(list(query), [self.normal_bookmark])
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="(#a or #b)")
+        )
+        self.assertCountEqual(list(query), [self.a_bookmark, self.b_bookmark])
+
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="not (#a or #b)")
+        )
+        self.assertCountEqual(list(query), [self.paren_bookmark, self.normal_bookmark])
+
+    def test_get_tags_for_query_returns_tag_with_parentheses(self):
+        result = queries.get_tags_for_query(
+            self.user, self.profile, "#hello(world) #normal"
+        )
+        self.assertCountEqual(list(result), [self.paren_tag, self.normal_tag])
+
+
 class GetSharedTagsForQueryTestCase(TestCase, BookmarkFactoryMixin):
     def setUp(self):
         self.user = self.get_or_create_test_user()
