@@ -632,3 +632,141 @@ class BookmarkIndexViewTestCase(
         html = response.content.decode()
 
         self.assertInHTML('<h2 id="bundles-heading">Bundles</h2>', html, count=0)
+
+
+class BookmarkIndexParenthesizedTagsViewTestCase(
+    TestCase, BookmarkFactoryMixin, BookmarkListTestMixin, TagCloudTestMixin
+):
+    """HTTP lock-in for searching tags whose names contain parentheses (OSFG-81)."""
+
+    def setUp(self):
+        self.user = self.get_or_create_test_user()
+        self.client.force_login(self.user)
+
+        self.paren_tag = self.setup_tag(name="hello(world)")
+        self.python_tag = self.setup_tag(name="python")
+        self.js_tag = self.setup_tag(name="javascript")
+
+        self.paren_bookmark = self.setup_bookmark(
+            title="Paren Tag Bookmark", tags=[self.paren_tag]
+        )
+        self.python_bookmark = self.setup_bookmark(
+            title="Python Bookmark", tags=[self.python_tag]
+        )
+        self.both_bookmark = self.setup_bookmark(
+            title="Both Tags Bookmark", tags=[self.paren_tag, self.python_tag]
+        )
+        self.js_bookmark = self.setup_bookmark(
+            title="JS only", tags=[self.js_tag]
+        )
+
+    def _get_index(self, q: str):
+        return self.client.get(
+            reverse("linkding:bookmarks.index"),
+            {"q": q},
+        )
+
+    def test_typed_search_for_tag_with_parentheses_returns_matches(self):
+        response = self._get_index("#hello(world)")
+        self.assertEqual(response.status_code, 200)
+        self.assertVisibleBookmarks(
+            response, [self.paren_bookmark, self.both_bookmark]
+        )
+        self.assertInvisibleBookmarks(
+            response, [self.python_bookmark, self.js_bookmark]
+        )
+        self.assertSelectedTags(response, [self.paren_tag])
+
+    def test_tag_cloud_link_for_parentheses_tag_filters_index(self):
+        # Render the unfiltered index and follow the tag-cloud link for hello(world)
+        index_url = reverse("linkding:bookmarks.index")
+        index = self.client.get(index_url)
+        soup = self.make_soup(index.content.decode())
+        tag_links = {
+            a.get_text(strip=True): a["href"]
+            for a in soup.select("a[data-is-tag-item]")
+        }
+        self.assertIn("hello(world)", tag_links)
+
+        href = tag_links["hello(world)"]
+        # Tag cloud links are relative query strings (e.g. "?q=%23hello%28world%29")
+        target = href if href.startswith("/") else index_url + href
+        response = self.client.get(target)
+        self.assertEqual(response.status_code, 200)
+        self.assertVisibleBookmarks(
+            response, [self.paren_bookmark, self.both_bookmark]
+        )
+        self.assertInvisibleBookmarks(
+            response, [self.python_bookmark, self.js_bookmark]
+        )
+        self.assertSelectedTags(response, [self.paren_tag])
+
+    def test_bookmark_chip_link_for_parentheses_tag_filters_index(self):
+        index_url = reverse("linkding:bookmarks.index")
+        index = self.client.get(index_url)
+        soup = self.make_soup(index.content.decode())
+        chip = None
+        for a in soup.select("a"):
+            if a.get_text(strip=True) in ("#hello(world)", "hello(world)"):
+                # Prefer list chips (not the cloud item, which has data-is-tag-item)
+                if a.has_attr("data-is-tag-item"):
+                    continue
+                href = a.get("href", "")
+                if "q=" in href:
+                    chip = a
+                    break
+        self.assertIsNotNone(chip, "expected a bookmark list chip for #hello(world)")
+
+        href = chip["href"]
+        target = href if href.startswith("/") else index_url + href
+        response = self.client.get(target)
+        self.assertEqual(response.status_code, 200)
+        self.assertVisibleBookmarks(
+            response, [self.paren_bookmark, self.both_bookmark]
+        )
+        self.assertSelectedTags(response, [self.paren_tag])
+
+    def test_normal_tag_and_boolean_search_still_work_with_paren_tags(self):
+        response = self._get_index("#python")
+        self.assertVisibleBookmarks(
+            response, [self.python_bookmark, self.both_bookmark]
+        )
+        self.assertInvisibleBookmarks(
+            response, [self.paren_bookmark, self.js_bookmark]
+        )
+
+        response = self._get_index("#python or #hello(world)")
+        self.assertVisibleBookmarks(
+            response,
+            [self.python_bookmark, self.paren_bookmark, self.both_bookmark],
+        )
+        self.assertInvisibleBookmarks(response, [self.js_bookmark])
+
+        response = self._get_index("#python and #hello(world)")
+        self.assertVisibleBookmarks(response, [self.both_bookmark])
+        self.assertInvisibleBookmarks(
+            response,
+            [self.python_bookmark, self.paren_bookmark, self.js_bookmark],
+        )
+
+        response = self._get_index("#python and not #hello(world)")
+        self.assertVisibleBookmarks(response, [self.python_bookmark])
+        self.assertInvisibleBookmarks(
+            response,
+            [self.both_bookmark, self.paren_bookmark, self.js_bookmark],
+        )
+
+    def test_unbalanced_partial_paren_tag_token_does_not_match_balanced_name(self):
+        # Unbalanced parentheses open a group rather than forming the tag name;
+        # the customer-visible balanced tag remains reachable via #hello(world)
+        # or the quoted form #"hello(world".
+        response = self._get_index("#hello(world")
+        html = response.content.decode().lower()
+        self.assertNotIn(self.paren_bookmark.title.lower(), html)
+        self.assertNotIn(self.both_bookmark.title.lower(), html)
+
+        response = self._get_index('#"hello(world"')
+        self.assertNotIn(
+            self.paren_bookmark.title,
+            response.content.decode(),
+        )
