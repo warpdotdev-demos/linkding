@@ -644,11 +644,16 @@ class BookmarkIndexParenthesizedTagsViewTestCase(
         self.client.force_login(self.user)
 
         self.paren_tag = self.setup_tag(name="hello(world)")
+        self.unbalanced_paren_tag = self.setup_tag(name="hello(world")
         self.python_tag = self.setup_tag(name="python")
         self.js_tag = self.setup_tag(name="javascript")
 
         self.paren_bookmark = self.setup_bookmark(
             title="Paren Tag Bookmark", tags=[self.paren_tag]
+        )
+        self.unbalanced_paren_bookmark = self.setup_bookmark(
+            title="Unbalanced Paren Tag Bookmark",
+            tags=[self.unbalanced_paren_tag],
         )
         self.python_bookmark = self.setup_bookmark(
             title="Python Bookmark", tags=[self.python_tag]
@@ -756,17 +761,33 @@ class BookmarkIndexParenthesizedTagsViewTestCase(
             [self.both_bookmark, self.paren_bookmark, self.js_bookmark],
         )
 
-    def test_unbalanced_partial_paren_tag_token_does_not_match_balanced_name(self):
-        # Unbalanced parentheses open a group rather than forming the tag name;
-        # the customer-visible balanced tag remains reachable via #hello(world)
-        # or the quoted form #"hello(world".
+    def test_unbalanced_paren_tag_requires_quoted_fallback(self):
+        # Unquoted #hello(world is a parse error (unbalanced group), so it must
+        # not match either the balanced or unbalanced tag. The quoted form is
+        # the supported escape hatch for the unbalanced tag name hello(world.
         response = self._get_index("#hello(world")
-        html = response.content.decode().lower()
-        self.assertNotIn(self.paren_bookmark.title.lower(), html)
-        self.assertNotIn(self.both_bookmark.title.lower(), html)
+        self.assertEqual(response.status_code, 200)
+        self.assertInvisibleBookmarks(
+            response,
+            [
+                self.paren_bookmark,
+                self.both_bookmark,
+                self.unbalanced_paren_bookmark,
+                self.python_bookmark,
+                self.js_bookmark,
+            ],
+        )
 
         response = self._get_index('#"hello(world"')
-        self.assertNotIn(
-            self.paren_bookmark.title,
-            response.content.decode(),
+        self.assertEqual(response.status_code, 200)
+        self.assertVisibleBookmarks(response, [self.unbalanced_paren_bookmark])
+        self.assertInvisibleBookmarks(
+            response,
+            [
+                self.paren_bookmark,
+                self.both_bookmark,
+                self.python_bookmark,
+                self.js_bookmark,
+            ],
         )
+        self.assertSelectedTags(response, [self.unbalanced_paren_tag])
