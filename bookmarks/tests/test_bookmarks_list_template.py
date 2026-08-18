@@ -1,6 +1,8 @@
 import datetime
+from unittest import mock
 
 from django.contrib.auth.models import AnonymousUser
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connections
 from django.db.utils import DEFAULT_DB_ALIAS
 from django.http import HttpResponse
@@ -19,7 +21,12 @@ from bookmarks.models import (
     User,
     UserProfile,
 )
-from bookmarks.tests.helpers import BookmarkFactoryMixin, HtmlTestMixin
+from bookmarks.services import assets
+from bookmarks.tests.helpers import (
+    BookmarkFactoryMixin,
+    HtmlTestMixin,
+    disable_logging,
+)
 from bookmarks.utils import app_version
 from bookmarks.views import contexts
 
@@ -591,11 +598,40 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         )
 
         self.assertBookmarksLink(html, bookmark, link_url=snapshot_url)
-        # the displayed URL keeps pointing to the bookmark URL
+
+    def test_bookmark_link_behavior_snapshot_should_not_change_displayed_url(self):
+        profile = self.get_or_create_test_user().profile
+        profile.bookmark_link_behavior = UserProfile.BOOKMARK_LINK_BEHAVIOR_SNAPSHOT
         profile.display_url = True
         profile.save()
+
+        bookmark = self.setup_bookmark()
+        bookmark.latest_snapshot = self.setup_asset(bookmark)
+        bookmark.save()
+
         html = self.render_template()
+
+        # the displayed URL line keeps pointing to the bookmark URL
         self.assertBookmarkURLVisible(html, bookmark)
+
+    def test_bookmark_link_behavior_snapshot_applies_to_archived_bookmarks(self):
+        profile = self.get_or_create_test_user().profile
+        profile.bookmark_link_behavior = UserProfile.BOOKMARK_LINK_BEHAVIOR_SNAPSHOT
+        profile.save()
+
+        bookmark = self.setup_bookmark(is_archived=True)
+        bookmark.latest_snapshot = self.setup_asset(bookmark)
+        bookmark.save()
+
+        html = self.render_template(
+            url="/bookmarks/archived",
+            context_type=contexts.ArchivedBookmarkListContext,
+        )
+        snapshot_url = reverse(
+            "linkding:assets.view", args=[bookmark.latest_snapshot.id]
+        )
+
+        self.assertBookmarksLink(html, bookmark, link_url=snapshot_url)
 
     def test_bookmark_link_behavior_snapshot_should_respect_link_target(self):
         profile = self.get_or_create_test_user().profile
@@ -629,21 +665,52 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
 
         self.assertBookmarksLink(html, bookmark)
 
+    @disable_logging
     def test_bookmark_link_behavior_snapshot_should_fall_back_to_url_without_complete_snapshot(
         self,
     ):
+        self.setup_temp_assets_dir()
+
         profile = self.get_or_create_test_user().profile
         profile.bookmark_link_behavior = UserProfile.BOOKMARK_LINK_BEHAVIOR_SNAPSHOT
         profile.save()
 
         bookmark = self.setup_bookmark()
-        self.setup_asset(bookmark, status=BookmarkAsset.STATUS_PENDING)
-        self.setup_asset(bookmark, status=BookmarkAsset.STATUS_FAILURE)
-        self.setup_asset(
+
+        # a snapshot that is still pending
+        pending_asset = assets.create_snapshot_asset(bookmark)
+        pending_asset.save()
+
+        # a snapshot whose creation failed
+        failed_asset = assets.create_snapshot_asset(bookmark)
+        failed_asset.save()
+        with (
+            mock.patch(
+                "bookmarks.services.assets.detect_content_type",
+                return_value="text/html",
+            ),
+            mock.patch(
+                "bookmarks.services.singlefile.create_snapshot",
+                side_effect=RuntimeError("Snapshot failed"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            assets.create_snapshot(failed_asset)
+
+        # a manually uploaded file, which is not a snapshot
+        assets.upload_asset(
             bookmark,
-            asset_type=BookmarkAsset.TYPE_UPLOAD,
-            status=BookmarkAsset.STATUS_COMPLETE,
+            SimpleUploadedFile(
+                "upload.html", b"<html></html>", content_type="text/html"
+            ),
         )
+
+        bookmark.refresh_from_db()
+        pending_asset.refresh_from_db()
+        failed_asset.refresh_from_db()
+        self.assertEqual(pending_asset.status, BookmarkAsset.STATUS_PENDING)
+        self.assertEqual(failed_asset.status, BookmarkAsset.STATUS_FAILURE)
+        self.assertIsNone(bookmark.latest_snapshot_id)
 
         html = self.render_template()
 
@@ -695,7 +762,7 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
             soup = self.make_soup(html)
             self.assertEqual(5, len(soup.select("ul.bookmark-list > li")))
 
-        number_of_queries = context.final_queries
+        number_of_queries = len(context.captured_queries)
 
         setup_bookmarks_with_snapshots(5)
 
