@@ -143,6 +143,15 @@ class BookmarkItem:
 
         self.id = bookmark.id
         self.url = bookmark.url
+        self.link_url = bookmark.url
+        if (
+            profile.bookmark_link_behavior
+            == UserProfile.BOOKMARK_LINK_BEHAVIOR_SNAPSHOT
+            and bookmark.latest_snapshot_id
+        ):
+            self.link_url = reverse(
+                "linkding:assets.view", args=[bookmark.latest_snapshot_id]
+            )
         self.title = bookmark.resolved_title
         self.description = bookmark.resolved_description
         self.notes = bookmark.notes
