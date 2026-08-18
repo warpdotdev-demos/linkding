@@ -86,6 +86,26 @@ class BookmarkIndexViewTestCase(
         self.assertVisibleBookmarks(response, visible_bookmarks)
         self.assertInvisibleBookmarks(response, invisible_bookmarks)
 
+    def test_should_list_bookmarks_matching_bundle_with_all_bookmarks(self):
+        foo_bookmarks = self.setup_numbered_bookmarks(3, prefix="foo")
+        bar_bookmarks = self.setup_numbered_bookmarks(3, prefix="bar")
+
+        bundle = self.setup_bundle(search="foo")
+
+        # default behavior is unchanged: only bundle-matching bookmarks
+        response = self.client.get(
+            reverse("linkding:bookmarks.index") + f"?bundle={bundle.id}"
+        )
+        self.assertVisibleBookmarks(response, foo_bookmarks)
+        self.assertInvisibleBookmarks(response, bar_bookmarks)
+
+        # with all_bookmarks, the bundle filter is bypassed
+        response = self.client.get(
+            reverse("linkding:bookmarks.index")
+            + f"?bundle={bundle.id}&all_bookmarks=yes"
+        )
+        self.assertVisibleBookmarks(response, foo_bookmarks + bar_bookmarks)
+
     def test_should_list_tags_for_unarchived_and_user_owned_bookmarks(self):
         other_user = User.objects.create_user(
             "otheruser", "otheruser@example.com", "password123"
@@ -269,6 +289,15 @@ class BookmarkIndexViewTestCase(
         response = self.client.get(base_url + url_params)
         self.assertEditLink(response, url)
 
+        # with all_bookmarks
+        bundle = self.setup_bundle()
+        url_params = f"?bundle={bundle.id}&all_bookmarks=yes"
+        return_url = urllib.parse.quote(base_url + url_params)
+        url = f"{edit_url}?return_url={return_url}"
+
+        response = self.client.get(base_url + url_params)
+        self.assertEditLink(response, url)
+
     def test_bulk_edit_respects_search_options(self):
         action_url = reverse("linkding:bookmarks.index.action")
         base_url = reverse("linkding:bookmarks.index")
@@ -289,6 +318,14 @@ class BookmarkIndexViewTestCase(
         # with query and sort
         url_params = "?q=foo&sort=title_asc"
         url = f"{action_url}?q=foo&sort=title_asc"
+
+        response = self.client.get(base_url + url_params)
+        self.assertBulkActionForm(response, url)
+
+        # with bundle and all_bookmarks
+        bundle = self.setup_bundle()
+        url_params = f"?bundle={bundle.id}&all_bookmarks=yes"
+        url = f"{action_url}?bundle={bundle.id}&all_bookmarks=yes"
 
         response = self.client.get(base_url + url_params)
         self.assertBulkActionForm(response, url)

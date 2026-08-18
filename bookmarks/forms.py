@@ -266,6 +266,11 @@ class BookmarkSearchForm(forms.Form):
     q = forms.CharField()
     user = forms.ChoiceField(required=False, widget=FormSelect)
     bundle = forms.CharField(required=False)
+    # Per-search option that widens a bundle-scoped search to all bookmarks.
+    # Rendered as a plain link rather than a form control, but still needs a
+    # form field so it round-trips as a hidden input when other search
+    # options are submitted.
+    all_bookmarks = forms.CharField(required=False)
     sort = forms.ChoiceField(choices=SORT_CHOICES, widget=FormSelect)
     shared = forms.ChoiceField(choices=FILTER_SHARED_CHOICES, widget=forms.RadioSelect)
     unread = forms.ChoiceField(choices=FILTER_UNREAD_CHOICES, widget=forms.RadioSelect)

@@ -1,4 +1,15 @@
 {% load static shared pagination %}
+{% if bookmark_list.bundle %}
+  <div class="search-scope-info" role="status">
+    {% if bookmark_list.is_all_bookmarks %}
+      <span>Searching all bookmarks, ignoring the "{{ bookmark_list.bundle.name }}" bundle.</span>
+      <a href="{{ bookmark_list.scope_toggle_url }}">Search within bundle</a>
+    {% else %}
+      <span>Searching within the "{{ bookmark_list.bundle.name }}" bundle.</span>
+      <a href="{{ bookmark_list.scope_toggle_url }}">Search all bookmarks</a>
+    {% endif %}
+  </div>
+{% endif %}
 {% if bookmark_list.is_empty %}
   {% include 'bookmarks/empty_bookmarks.html' %}
 {% else %}

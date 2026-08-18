@@ -5,6 +5,18 @@
       The search query you entered is not valid. Common reasons are unclosed parentheses or a logical operator (AND, OR,
       NOT) without operands. The error message from the parser is: "{{ bookmark_list.query_error_message }}".
     </p>
+  {% elif bookmark_list.search.has_modifications %}
+    <p class="empty-title h5">No bookmarks found</p>
+    <p class="empty-subtitle">
+      No bookmarks match the current search{% if bookmark_list.bundle %} within the "{{ bookmark_list.bundle.name }}" bundle{% endif %}.
+      {% if bookmark_list.scope_toggle_url %}
+        {% if bookmark_list.is_all_bookmarks %}
+          Try <a href="{{ bookmark_list.scope_toggle_url }}">searching within the bundle</a> instead.
+        {% else %}
+          Try <a href="{{ bookmark_list.scope_toggle_url }}">searching all bookmarks</a> instead.
+        {% endif %}
+      {% endif %}
+    </p>
   {% else %}
     <p class="empty-title h5">You have no bookmarks yet</p>
     <p class="empty-subtitle">

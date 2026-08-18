@@ -79,6 +79,30 @@ class BookmarkArchivedViewTestCase(
         self.assertVisibleBookmarks(response, visible_bookmarks)
         self.assertInvisibleBookmarks(response, invisible_bookmarks)
 
+    def test_should_list_bookmarks_matching_bundle_with_all_bookmarks(self):
+        foo_bookmarks = self.setup_numbered_bookmarks(
+            3, prefix="foo", archived=True
+        )
+        bar_bookmarks = self.setup_numbered_bookmarks(
+            3, prefix="bar", archived=True
+        )
+
+        bundle = self.setup_bundle(search="foo")
+
+        # default behavior is unchanged: only bundle-matching bookmarks
+        response = self.client.get(
+            reverse("linkding:bookmarks.archived") + f"?bundle={bundle.id}"
+        )
+        self.assertVisibleBookmarks(response, foo_bookmarks)
+        self.assertInvisibleBookmarks(response, bar_bookmarks)
+
+        # with all_bookmarks, the bundle filter is bypassed
+        response = self.client.get(
+            reverse("linkding:bookmarks.archived")
+            + f"?bundle={bundle.id}&all_bookmarks=yes"
+        )
+        self.assertVisibleBookmarks(response, foo_bookmarks + bar_bookmarks)
+
     def test_should_list_tags_for_archived_and_user_owned_bookmarks(self):
         other_user = User.objects.create_user(
             "otheruser", "otheruser@example.com", "password123"
