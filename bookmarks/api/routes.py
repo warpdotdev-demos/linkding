@@ -59,6 +59,10 @@ class BookmarkViewSet(
         # Provide filtered queryset for list actions
         user = self.request.user
         search = BookmarkSearch.from_request(self.request, self.request.GET)
+        # The all_bookmarks option that widens a bundle-scoped search is a
+        # UI-only convenience; the REST API stays bundle-scoped regardless of
+        # this param.
+        search.all_bookmarks = BookmarkSearch.ALL_BOOKMARKS_OFF
         if self.action == "list":
             return queries.query_bookmarks(user, user.profile, search)
         elif self.action == "archived":
