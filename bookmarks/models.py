@@ -372,6 +372,12 @@ class UserProfile(models.Model):
         (BOOKMARK_LINK_TARGET_BLANK, "New page"),
         (BOOKMARK_LINK_TARGET_SELF, "Same page"),
     ]
+    BOOKMARK_LINK_BEHAVIOR_URL = "url"
+    BOOKMARK_LINK_BEHAVIOR_SNAPSHOT = "snapshot"
+    BOOKMARK_LINK_BEHAVIOR_CHOICES = [
+        (BOOKMARK_LINK_BEHAVIOR_URL, "URL"),
+        (BOOKMARK_LINK_BEHAVIOR_SNAPSHOT, "Latest snapshot"),
+    ]
     WEB_ARCHIVE_INTEGRATION_DISABLED = "disabled"
     WEB_ARCHIVE_INTEGRATION_ENABLED = "enabled"
     WEB_ARCHIVE_INTEGRATION_CHOICES = [
@@ -415,6 +421,12 @@ class UserProfile(models.Model):
         choices=BOOKMARK_LINK_TARGET_CHOICES,
         blank=False,
         default=BOOKMARK_LINK_TARGET_BLANK,
+    )
+    bookmark_link_behavior = models.CharField(
+        max_length=10,
+        choices=BOOKMARK_LINK_BEHAVIOR_CHOICES,
+        blank=False,
+        default=BOOKMARK_LINK_BEHAVIOR_URL,
     )
     web_archive_integration = models.CharField(
         max_length=10,

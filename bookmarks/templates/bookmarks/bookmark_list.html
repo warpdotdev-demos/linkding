@@ -23,7 +23,7 @@
               {% if bookmark_item.favicon_file and bookmark_list.show_favicons %}
                 <img class="favicon" src="{% static bookmark_item.favicon_file %}" alt="">
               {% endif %}
-              <a href="{{ bookmark_item.url }}"
+              <a href="{{ bookmark_item.link_url }}"
                  target="{{ bookmark_list.link_target }}"
                  rel="noopener">
                 <span>{{ bookmark_item.title }}</span>

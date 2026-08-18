@@ -143,16 +143,28 @@ class BookmarkItem:
 
         self.id = bookmark.id
         self.url = bookmark.url
+
+        latest_snapshot_url = (
+            reverse("linkding:assets.view", args=[bookmark.latest_snapshot_id])
+            if bookmark.latest_snapshot_id
+            else None
+        )
+
+        self.link_url = bookmark.url
+        if (
+            latest_snapshot_url
+            and profile.bookmark_link_behavior
+            == UserProfile.BOOKMARK_LINK_BEHAVIOR_SNAPSHOT
+        ):
+            self.link_url = latest_snapshot_url
         self.title = bookmark.resolved_title
         self.description = bookmark.resolved_description
         self.notes = bookmark.notes
         self.tag_names = bookmark.tag_names
         self.tags = [AddTagItem(context, tag) for tag in bookmark.tags.all()]
         self.tags.sort(key=lambda item: item.name)
-        if bookmark.latest_snapshot_id:
-            self.snapshot_url = reverse(
-                "linkding:assets.view", args=[bookmark.latest_snapshot_id]
-            )
+        if latest_snapshot_url:
+            self.snapshot_url = latest_snapshot_url
             self.snapshot_title = "View latest snapshot"
         else:
             self.snapshot_url = bookmark.web_archive_snapshot_url

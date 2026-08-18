@@ -28,6 +28,7 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
             "bookmark_description_display": UserProfile.BOOKMARK_DESCRIPTION_DISPLAY_INLINE,
             "bookmark_description_max_lines": 1,
             "bookmark_link_target": UserProfile.BOOKMARK_LINK_TARGET_BLANK,
+            "bookmark_link_behavior": UserProfile.BOOKMARK_LINK_BEHAVIOR_URL,
             "web_archive_integration": UserProfile.WEB_ARCHIVE_INTEGRATION_DISABLED,
             "enable_sharing": False,
             "enable_public_sharing": False,
@@ -100,6 +101,7 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
             "bookmark_description_display": UserProfile.BOOKMARK_DESCRIPTION_DISPLAY_SEPARATE,
             "bookmark_description_max_lines": 3,
             "bookmark_link_target": UserProfile.BOOKMARK_LINK_TARGET_SELF,
+            "bookmark_link_behavior": UserProfile.BOOKMARK_LINK_BEHAVIOR_SNAPSHOT,
             "web_archive_integration": UserProfile.WEB_ARCHIVE_INTEGRATION_ENABLED,
             "enable_sharing": True,
             "enable_public_sharing": True,
@@ -146,6 +148,10 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
         )
         self.assertEqual(
             self.user.profile.bookmark_link_target, form_data["bookmark_link_target"]
+        )
+        self.assertEqual(
+            self.user.profile.bookmark_link_behavior,
+            form_data["bookmark_link_behavior"],
         )
         self.assertEqual(
             self.user.profile.web_archive_integration,
@@ -210,6 +216,58 @@ class SettingsGeneralViewTestCase(TestCase, BookmarkFactoryMixin):
         self.assertEqual(self.user.profile.legacy_search, form_data["legacy_search"])
 
         self.assertSuccessMessage(html, "Profile updated")
+
+    def test_bookmark_link_behavior_is_rendered(self):
+        response = self.client.get(reverse("linkding:settings.general"))
+        html = response.content.decode()
+
+        self.assertInHTML(
+            """
+            <label for="id_bookmark_link_behavior" class="form-label">Open bookmarks at</label>
+        """,
+            html,
+            count=1,
+        )
+        self.assertInHTML(
+            """
+            <option value="url" selected>URL</option>
+        """,
+            html,
+            count=1,
+        )
+        self.assertInHTML(
+            """
+            <option value="snapshot">Latest snapshot</option>
+        """,
+            html,
+            count=1,
+        )
+
+    def test_update_profile_saves_bookmark_link_behavior(self):
+        form_data = self.create_profile_form_data(
+            {"bookmark_link_behavior": UserProfile.BOOKMARK_LINK_BEHAVIOR_SNAPSHOT}
+        )
+        response = self.client.post(
+            reverse("linkding:settings.update"), form_data, follow=True
+        )
+        self.user.profile.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.user.profile.bookmark_link_behavior,
+            UserProfile.BOOKMARK_LINK_BEHAVIOR_SNAPSHOT,
+        )
+
+        form_data = self.create_profile_form_data(
+            {"bookmark_link_behavior": UserProfile.BOOKMARK_LINK_BEHAVIOR_URL}
+        )
+        self.client.post(reverse("linkding:settings.update"), form_data, follow=True)
+        self.user.profile.refresh_from_db()
+
+        self.assertEqual(
+            self.user.profile.bookmark_link_behavior,
+            UserProfile.BOOKMARK_LINK_BEHAVIOR_URL,
+        )
 
     def test_update_profile_with_invalid_form_returns_422(self):
         form_data = self.create_profile_form_data({"items_per_page": "-1"})
