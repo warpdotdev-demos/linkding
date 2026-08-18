@@ -130,6 +130,11 @@ def shared(request: HttpRequest):
         request, contexts.SharedBookmarkDetailsContext
     )
     user_list = contexts.UserListContext(request, search)
+    # Keep the user filter in the feed URL, so that subscribing from a feed
+    # reader results in a feed for that user instead of the global one
+    rss_feed_url = reverse("linkding:feeds.public_shared")
+    if search.user:
+        rss_feed_url += "?" + urllib.parse.urlencode({"user": search.user})
     return render_bookmarks_view(
         request,
         {
@@ -138,7 +143,7 @@ def shared(request: HttpRequest):
             "tag_cloud": tag_cloud,
             "details": bookmark_details,
             "user_list": user_list,
-            "rss_feed_url": reverse("linkding:feeds.public_shared"),
+            "rss_feed_url": rss_feed_url,
         },
     )
 

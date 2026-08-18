@@ -7,7 +7,7 @@ from django.http import HttpRequest
 from django.urls import reverse
 
 from bookmarks import queries
-from bookmarks.models import Bookmark, BookmarkSearch, FeedToken, UserProfile
+from bookmarks.models import Bookmark, BookmarkSearch, FeedToken, User, UserProfile
 from bookmarks.views import access
 
 
@@ -16,6 +16,8 @@ class FeedContext:
     request: HttpRequest
     feed_token: FeedToken | None
     query_set: QuerySet[Bookmark]
+    # The single user that the feed is scoped to, if any
+    user: User | None = None
 
 
 def sanitize(text: str):
@@ -28,7 +30,18 @@ def sanitize(text: str):
     )
 
 
+def qualify_with_user(text: str, user: User | None):
+    """Adds the user that a feed is scoped to to a feed title or description, so
+    that feeds of different users can be told apart in a feed reader."""
+    return f"{text} ({user.username})" if user else text
+
+
 class BaseBookmarksFeed(Feed):
+    # Base title and description, qualified with the feed's user if the feed is
+    # scoped to a single user
+    base_title = ""
+    base_description = ""
+
     def get_object(self, request, feed_key: str | None):
         feed_token = FeedToken.objects.get(key__exact=feed_key) if feed_key else None
         bundle = None
@@ -38,15 +51,31 @@ class BaseBookmarksFeed(Feed):
 
         search = BookmarkSearch(
             q=request.GET.get("q", ""),
+            user=request.GET.get("user", ""),
             unread=request.GET.get("unread", ""),
             shared=request.GET.get("shared", ""),
             bundle=bundle,
         )
-        query_set = self.get_query_set(feed_token, search)
-        return FeedContext(request, feed_token, query_set)
+        user = self.get_user(feed_token, search)
+        query_set = self.get_query_set(feed_token, search, user)
+        return FeedContext(request, feed_token, query_set, user)
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
+    def get_user(
+        self, feed_token: FeedToken | None, search: BookmarkSearch
+    ) -> User | None:
+        """Returns the single user that the feed is scoped to, if any."""
+        return feed_token.user if feed_token else None
+
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
         raise NotImplementedError
+
+    def title(self, context: FeedContext):
+        return qualify_with_user(self.base_title, context.user)
+
+    def description(self, context: FeedContext):
+        return qualify_with_user(self.base_description, context.user)
 
     def items(self, context: FeedContext):
         limit = context.request.GET.get("limit", 100)
@@ -71,10 +100,12 @@ class BaseBookmarksFeed(Feed):
 
 
 class AllBookmarksFeed(BaseBookmarksFeed):
-    title = "All bookmarks"
-    description = "All bookmarks"
+    base_title = "All bookmarks"
+    base_description = "All bookmarks"
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
         return queries.query_bookmarks(feed_token.user, feed_token.user.profile, search)
 
     def link(self, context: FeedContext):
@@ -82,10 +113,12 @@ class AllBookmarksFeed(BaseBookmarksFeed):
 
 
 class UnreadBookmarksFeed(BaseBookmarksFeed):
-    title = "Unread bookmarks"
-    description = "All unread bookmarks"
+    base_title = "Unread bookmarks"
+    base_description = "All unread bookmarks"
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
         return queries.query_bookmarks(
             feed_token.user, feed_token.user.profile, search
         ).filter(unread=True)
@@ -95,10 +128,17 @@ class UnreadBookmarksFeed(BaseBookmarksFeed):
 
 
 class SharedBookmarksFeed(BaseBookmarksFeed):
-    title = "Shared bookmarks"
-    description = "All shared bookmarks"
+    base_title = "Shared bookmarks"
+    base_description = "All shared bookmarks"
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
+    def get_user(self, feed_token: FeedToken | None, search: BookmarkSearch):
+        # This feed contains the shared bookmarks of all users, not just the
+        # ones of the feed token's user, so it is not scoped to a single user
+        return None
+
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
         return queries.query_shared_bookmarks(
             None, feed_token.user.profile, search, False
         )
@@ -108,14 +148,24 @@ class SharedBookmarksFeed(BaseBookmarksFeed):
 
 
 class PublicSharedBookmarksFeed(BaseBookmarksFeed):
-    title = "Public shared bookmarks"
-    description = "All public shared bookmarks"
+    base_title = "Public shared bookmarks"
+    base_description = "All public shared bookmarks"
 
     def get_object(self, request):
         return super().get_object(request, None)
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
-        return queries.query_shared_bookmarks(None, UserProfile(), search, True)
+    def get_user(self, feed_token: FeedToken | None, search: BookmarkSearch):
+        if not search.user:
+            return None
+        # Raises User.DoesNotExist, which the syndication framework turns into a
+        # 404, for unknown usernames. That way a broken subscription is visible
+        # instead of silently returning the bookmarks of all users.
+        return User.objects.get(username=search.user)
+
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
+        return queries.query_shared_bookmarks(user, UserProfile(), search, True)
 
     def link(self, context: FeedContext):
         return reverse("linkding:feeds.public_shared")

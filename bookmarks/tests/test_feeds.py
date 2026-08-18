@@ -61,8 +61,10 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
         response = self.client.get(feed_url)
         self.assertEqual(response.status_code, 200)
 
-        self.assertContains(response, "<title>All bookmarks</title>")
-        self.assertContains(response, "<description>All bookmarks</description>")
+        self.assertContains(response, "<title>All bookmarks (testuser)</title>")
+        self.assertContains(
+            response, "<description>All bookmarks (testuser)</description>"
+        )
         self.assertContains(response, f"<link>http://testserver{feed_url}</link>")
         self.assertContains(
             response, f'<atom:link href="http://testserver{feed_url}" rel="self"/>'
@@ -105,8 +107,10 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
         response = self.client.get(feed_url)
         self.assertEqual(response.status_code, 200)
 
-        self.assertContains(response, "<title>Unread bookmarks</title>")
-        self.assertContains(response, "<description>All unread bookmarks</description>")
+        self.assertContains(response, "<title>Unread bookmarks (testuser)</title>")
+        self.assertContains(
+            response, "<description>All unread bookmarks (testuser)</description>"
+        )
         self.assertContains(response, f"<link>http://testserver{feed_url}</link>")
         self.assertContains(
             response, f'<atom:link href="http://testserver{feed_url}" rel="self"/>'
@@ -223,6 +227,109 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
         response = self.client.get(reverse("linkding:feeds.public_shared"))
         self.assertEqual(response.status_code, 200)
         self.assertFeedItems(response, public_shared_bookmarks)
+
+    def test_public_shared_metadata_with_user_parameter(self):
+        user = self.setup_user(
+            name="alice", enable_sharing=True, enable_public_sharing=True
+        )
+        feed_url = reverse("linkding:feeds.public_shared")
+
+        response = self.client.get(feed_url + f"?user={user.username}")
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(response, "<title>Public shared bookmarks (alice)</title>")
+        self.assertContains(
+            response,
+            "<description>All public shared bookmarks (alice)</description>",
+        )
+
+    def test_public_shared_with_user_parameter_returns_bookmarks_of_that_user_only(
+        self,
+    ):
+        user1 = self.setup_user(
+            name="alice", enable_sharing=True, enable_public_sharing=True
+        )
+        user2 = self.setup_user(
+            name="bob", enable_sharing=True, enable_public_sharing=True
+        )
+
+        user1_bookmarks = [
+            self.setup_bookmark(shared=True, user=user1, description="test"),
+            self.setup_bookmark(shared=True, user=user1, description="test"),
+        ]
+        user2_bookmarks = [
+            self.setup_bookmark(shared=True, user=user2, description="test"),
+        ]
+
+        feed_url = reverse("linkding:feeds.public_shared")
+
+        response = self.client.get(feed_url + "?user=alice")
+        self.assertEqual(response.status_code, 200)
+        self.assertFeedItems(response, user1_bookmarks)
+
+        response = self.client.get(feed_url + "?user=bob")
+        self.assertEqual(response.status_code, 200)
+        self.assertFeedItems(response, user2_bookmarks)
+
+        # without user parameter the feed contains the bookmarks of all users
+        response = self.client.get(feed_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertFeedItems(response, user1_bookmarks + user2_bookmarks)
+
+    def test_public_shared_with_user_parameter_returns_publicly_shared_bookmarks_only(
+        self,
+    ):
+        user = self.setup_user(name="alice", enable_sharing=True)
+        self.setup_bookmark(shared=True, user=user)
+
+        response = self.client.get(
+            reverse("linkding:feeds.public_shared") + "?user=alice"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<item>", count=0)
+
+    def test_public_shared_returns_404_for_unknown_user(self):
+        response = self.client.get(
+            reverse("linkding:feeds.public_shared") + "?user=unknown"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_public_shared_escapes_username_in_metadata(self):
+        # bypasses username validation, which does not allow these characters
+        User.objects.create_user("a&b<c>", "acme@example.com", "password123")
+
+        response = self.client.get(
+            reverse("linkding:feeds.public_shared")
+            + "?user="
+            + urllib.parse.quote("a&b<c>")
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(
+            response, "<title>Public shared bookmarks (a&amp;b&lt;c&gt;)</title>"
+        )
+        self.assertContains(
+            response,
+            "<description>All public shared bookmarks (a&amp;b&lt;c&gt;)</description>",
+        )
+
+    def test_token_feeds_ignore_user_parameter(self):
+        other_user = self.setup_user(name="alice")
+        self.setup_bookmark(shared=True)
+
+        for feed_name, expected_title in [
+            ("feeds.all", "All bookmarks (testuser)"),
+            ("feeds.unread", "Unread bookmarks (testuser)"),
+            ("feeds.shared", "Shared bookmarks"),
+        ]:
+            with self.subTest(feed_name):
+                response = self.client.get(
+                    reverse(f"linkding:{feed_name}", args=[self.token.key])
+                    + f"?user={other_user.username}"
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f"<title>{expected_title}</title>")
 
     def test_with_query(self):
         tag1 = self.setup_tag()

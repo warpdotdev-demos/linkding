@@ -220,6 +220,11 @@
           A <code>shared</code> parameter for filtering for shared or unshared bookmarks. Use <code>yes</code> for
           shared bookmarks and <code>no</code> for unshared bookmarks.
         </li>
+        <li>
+          A <code>user</code> parameter for limiting the public shared feed to the bookmarks of a single user, for
+          example <code>?user=joe</code>. The username is added to the feed title. Unknown usernames return a 404.
+          This parameter only applies to the public shared feed.
+        </li>
       </ul>
       <p>
         <strong>Please note that these URLs include an authentication token that should be treated like any other
