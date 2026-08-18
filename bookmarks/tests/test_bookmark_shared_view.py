@@ -131,6 +131,34 @@ class BookmarkSharedViewTestCase(
         self.assertVisibleBookmarks(response, visible_bookmarks)
         self.assertInvisibleBookmarks(response, invisible_bookmarks)
 
+    def test_global_scope_search_returns_bookmarks_outside_bundle(self):
+        self.authenticate()
+        user = self.setup_user(enable_sharing=True)
+
+        bundle_bookmarks = self.setup_numbered_bookmarks(
+            2, shared=True, user=user, prefix="foo"
+        )
+        other_bookmarks = self.setup_numbered_bookmarks(
+            2, shared=True, user=user, prefix="bar"
+        )
+
+        bundle = self.setup_bundle(search="foo")
+
+        response = self.client.get(
+            reverse("linkding:bookmarks.shared")
+            + f"?bundle={bundle.id}&q=bar&scope={BookmarkSearch.SCOPE_ALL}"
+        )
+
+        self.assertVisibleBookmarks(response, other_bookmarks)
+        self.assertInvisibleBookmarks(response, bundle_bookmarks)
+
+        # unchanged without the scope param
+        response = self.client.get(
+            reverse("linkding:bookmarks.shared") + f"?bundle={bundle.id}&q=bar"
+        )
+
+        self.assertInvisibleBookmarks(response, bundle_bookmarks + other_bookmarks)
+
     def test_should_list_only_publicly_shared_bookmarks_without_login(self):
         user1 = self.setup_user(enable_sharing=True, enable_public_sharing=True)
         user2 = self.setup_user(enable_sharing=True)

@@ -301,3 +301,81 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
                 "unread": BookmarkSearch.FILTER_UNREAD_OFF,
             },
         )
+
+    def test_scope_defaults_to_bundle(self):
+        search = BookmarkSearch()
+        self.assertEqual(search.scope, BookmarkSearch.SCOPE_BUNDLE)
+        self.assertFalse(search.is_modified("scope"))
+
+        # without a bundle, the scope does not affect the query either way
+        self.assertFalse(search.applies_bundle_filter)
+
+    def test_scope_from_request(self):
+        bundle = self.setup_bundle()
+        request = MockRequest(self.get_or_create_test_user())
+
+        # bundle scope by default
+        query_dict = QueryDict(f"bundle={bundle.id}&q=search query")
+        search = BookmarkSearch.from_request(request, query_dict)
+        self.assertEqual(search.scope, BookmarkSearch.SCOPE_BUNDLE)
+        self.assertTrue(search.applies_bundle_filter)
+
+        # global scope keeps the bundle, but does not apply its filter
+        query_dict = QueryDict(f"bundle={bundle.id}&q=search query&scope=all")
+        search = BookmarkSearch.from_request(request, query_dict)
+        self.assertEqual(search.scope, BookmarkSearch.SCOPE_ALL)
+        self.assertEqual(search.bundle, bundle)
+        self.assertFalse(search.applies_bundle_filter)
+
+    def test_unknown_scope_falls_back_to_bundle(self):
+        bundle = self.setup_bundle()
+        request = MockRequest(self.get_or_create_test_user())
+        query_dict = QueryDict(f"bundle={bundle.id}&scope=everything")
+
+        search = BookmarkSearch.from_request(request, query_dict)
+        self.assertEqual(search.scope, BookmarkSearch.SCOPE_BUNDLE)
+        self.assertTrue(search.applies_bundle_filter)
+        # invalid values never leak into generated URLs
+        self.assertNotIn("scope", search.query_params)
+
+    def test_query_params_include_scope_only_when_modified(self):
+        search = BookmarkSearch(scope=BookmarkSearch.SCOPE_BUNDLE)
+        self.assertNotIn("scope", search.query_params)
+
+        search = BookmarkSearch(scope=BookmarkSearch.SCOPE_ALL)
+        self.assertEqual(search.query_params["scope"], BookmarkSearch.SCOPE_ALL)
+
+    def test_has_filters_ignores_sort_and_scope(self):
+        # no params
+        self.assertFalse(BookmarkSearch().has_filters)
+
+        # sort and scope do not narrow down the result set
+        self.assertFalse(BookmarkSearch(sort=BookmarkSearch.SORT_TITLE_ASC).has_filters)
+        self.assertFalse(BookmarkSearch(scope=BookmarkSearch.SCOPE_ALL).has_filters)
+
+        # every other param does
+        bundle = self.setup_bundle()
+        self.assertTrue(BookmarkSearch(q="search query").has_filters)
+        self.assertTrue(BookmarkSearch(user="user123").has_filters)
+        self.assertTrue(BookmarkSearch(bundle=bundle).has_filters)
+        self.assertTrue(
+            BookmarkSearch(shared=BookmarkSearch.FILTER_SHARED_SHARED).has_filters
+        )
+        self.assertTrue(
+            BookmarkSearch(unread=BookmarkSearch.FILTER_UNREAD_YES).has_filters
+        )
+        self.assertTrue(
+            BookmarkSearch(modified_since="2025-01-01T00:00:00Z").has_filters
+        )
+        self.assertTrue(BookmarkSearch(added_since="2025-01-01T00:00:00Z").has_filters)
+
+    def test_scope_is_not_a_preference(self):
+        self.assertNotIn("scope", BookmarkSearch.preferences)
+
+        search = BookmarkSearch(scope=BookmarkSearch.SCOPE_ALL)
+        self.assertNotIn("scope", search.preferences_dict)
+        self.assertFalse(search.has_modified_preferences)
+
+        # a scope preference cannot make global search the default
+        search = BookmarkSearch(preferences={"scope": BookmarkSearch.SCOPE_ALL})
+        self.assertNotIn("scope", search.preferences_dict)

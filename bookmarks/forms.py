@@ -262,6 +262,10 @@ class BookmarkSearchForm(forms.Form):
         (BookmarkSearch.FILTER_UNREAD_YES, "Unread"),
         (BookmarkSearch.FILTER_UNREAD_NO, "Read"),
     ]
+    SCOPE_CHOICES = [
+        (BookmarkSearch.SCOPE_BUNDLE, "Selected bundle"),
+        (BookmarkSearch.SCOPE_ALL, "All bookmarks"),
+    ]
 
     q = forms.CharField()
     user = forms.ChoiceField(required=False, widget=FormSelect)
@@ -271,6 +275,7 @@ class BookmarkSearchForm(forms.Form):
     unread = forms.ChoiceField(choices=FILTER_UNREAD_CHOICES, widget=forms.RadioSelect)
     modified_since = forms.CharField(required=False)
     added_since = forms.CharField(required=False)
+    scope = forms.ChoiceField(choices=SCOPE_CHOICES, required=False)
 
     def __init__(
         self,

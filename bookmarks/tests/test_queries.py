@@ -1328,6 +1328,52 @@ class QueriesBasicTestCase(TestCase, BookmarkFactoryMixin):
         query = queries.query_bookmarks(self.user, self.profile, search)
         self.assertQueryResult(query, [matching_bookmarks])
 
+    def test_query_bookmarks_bundle_scope_applies_bundle_filter(self):
+        bundle = self.setup_bundle(search="foo")
+        bundle_bookmarks = [self.setup_bookmark(title="foo 1")]
+        self.setup_bookmark(title="bar 1")
+
+        # implicit default scope
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(bundle=bundle)
+        )
+        self.assertQueryResult(query, [bundle_bookmarks])
+
+        # explicit bundle scope
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(bundle=bundle, scope=BookmarkSearch.SCOPE_BUNDLE),
+        )
+        self.assertQueryResult(query, [bundle_bookmarks])
+
+        # a query is combined with the bundle filter
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="bar", bundle=bundle)
+        )
+        self.assertQueryResult(query, [[]])
+
+    def test_query_bundle_with_global_scope_ignores_bundle_filter(self):
+        bundle = self.setup_bundle(search="foo")
+        bundle_bookmarks = [self.setup_bookmark(title="foo 1")]
+        other_bookmarks = [self.setup_bookmark(title="bar 1")]
+
+        # the query is applied without the bundle filter
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(q="bar", bundle=bundle, scope=BookmarkSearch.SCOPE_ALL),
+        )
+        self.assertQueryResult(query, [other_bookmarks])
+
+        # without a query, all bookmarks are returned
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(bundle=bundle, scope=BookmarkSearch.SCOPE_ALL),
+        )
+        self.assertQueryResult(query, [bundle_bookmarks, other_bookmarks])
+
     def test_query_bookmarks_with_bundle_any_tags(self):
         bundle = self.setup_bundle(any_tags="bundleTag1 bundleTag2")
 

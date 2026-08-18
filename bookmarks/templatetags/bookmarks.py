@@ -1,5 +1,6 @@
 from django import template
 
+from bookmarks import utils
 from bookmarks.forms import BookmarkSearchForm
 from bookmarks.models import BookmarkSearch
 
@@ -18,11 +19,14 @@ def bookmark_search(context, search: BookmarkSearch, mode: str = ""):
         preferences_form = BookmarkSearchForm(
             search, editable_fields=["sort", "shared", "unread"]
         )
+    request = context["request"]
     return {
-        "request": context["request"],
+        "request": request,
         "app_version": context["app_version"],
         "search": search,
         "search_form": search_form,
         "preferences_form": preferences_form,
         "mode": mode,
+        "scope_all_url": utils.scope_url(request, BookmarkSearch.SCOPE_ALL),
+        "scope_bundle_url": utils.scope_url(request, None),
     }

@@ -1074,9 +1074,7 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         self.setup_bookmark(title="Test Bookmark")
         html = self.render_template(url="/bookmarks?q=nonexistent")
 
-        self.assertInHTML(
-            '<p class="empty-title h5">You have no bookmarks yet</p>', html
-        )
+        self.assertInHTML('<p class="empty-title h5">No bookmarks found</p>', html)
 
     def test_empty_state_with_invalid_query(self):
         self.setup_bookmark()
@@ -1094,6 +1092,58 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         html = self.render_template(url="/bookmarks?q=(test")
 
         # With legacy search, search queries are not validated
+        self.assertInHTML('<p class="empty-title h5">No bookmarks found</p>', html)
+
+    def test_empty_state_shows_no_results_and_global_search_link_when_bundle_scoped(
+        self,
+    ):
+        self.setup_bookmark(title="bar 1")
+        bundle = self.setup_bundle(name="Favorites", search="foo")
+
+        html = self.render_template(url=f"/bookmarks?bundle={bundle.id}&q=bar")
+        soup = self.make_soup(html)
+
+        self.assertInHTML('<p class="empty-title h5">No bookmarks found</p>', html)
+        self.assertInHTML(
+            '<p class="empty-title h5">You have no bookmarks yet</p>', html, count=0
+        )
+
+        link = soup.select_one(".empty a")
+        self.assertIsNotNone(link)
+        self.assertEqual(link.text.strip(), "Search all bookmarks")
+        self.assertIn(f"scope={BookmarkSearch.SCOPE_ALL}", link["href"])
+        self.assertIn("q=bar", link["href"])
+
+    def test_empty_state_shows_no_results_without_global_link_in_global_scope(self):
+        bundle = self.setup_bundle(name="Favorites", search="foo")
+
+        html = self.render_template(
+            url=f"/bookmarks?bundle={bundle.id}&q=nonexistent&scope={BookmarkSearch.SCOPE_ALL}"
+        )
+        soup = self.make_soup(html)
+
+        self.assertInHTML('<p class="empty-title h5">No bookmarks found</p>', html)
+        self.assertIsNone(soup.select_one(".empty a"))
+
+    def test_empty_state_shows_first_run_message_without_filters(self):
+        html = self.render_template()
+
+        self.assertInHTML(
+            '<p class="empty-title h5">You have no bookmarks yet</p>', html
+        )
+
+    def test_empty_state_shows_first_run_message_when_only_sort_is_modified(self):
+        html = self.render_template(
+            url=f"/bookmarks?sort={BookmarkSearch.SORT_TITLE_ASC}"
+        )
+
+        self.assertInHTML(
+            '<p class="empty-title h5">You have no bookmarks yet</p>', html
+        )
+
+        # the same goes for a scope param on its own
+        html = self.render_template(url=f"/bookmarks?scope={BookmarkSearch.SCOPE_ALL}")
+
         self.assertInHTML(
             '<p class="empty-title h5">You have no bookmarks yet</p>', html
         )

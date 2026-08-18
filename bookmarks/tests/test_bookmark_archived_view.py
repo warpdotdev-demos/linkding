@@ -79,6 +79,27 @@ class BookmarkArchivedViewTestCase(
         self.assertVisibleBookmarks(response, visible_bookmarks)
         self.assertInvisibleBookmarks(response, invisible_bookmarks)
 
+    def test_global_scope_search_returns_bookmarks_outside_bundle(self):
+        bundle_bookmarks = self.setup_numbered_bookmarks(2, prefix="foo", archived=True)
+        other_bookmarks = self.setup_numbered_bookmarks(2, prefix="bar", archived=True)
+
+        bundle = self.setup_bundle(search="foo")
+
+        response = self.client.get(
+            reverse("linkding:bookmarks.archived")
+            + f"?bundle={bundle.id}&q=bar&scope={BookmarkSearch.SCOPE_ALL}"
+        )
+
+        self.assertVisibleBookmarks(response, other_bookmarks)
+        self.assertInvisibleBookmarks(response, bundle_bookmarks)
+
+        # unchanged without the scope param
+        response = self.client.get(
+            reverse("linkding:bookmarks.archived") + f"?bundle={bundle.id}&q=bar"
+        )
+
+        self.assertInvisibleBookmarks(response, bundle_bookmarks + other_bookmarks)
+
     def test_should_list_tags_for_archived_and_user_owned_bookmarks(self):
         other_user = User.objects.create_user(
             "otheruser", "otheruser@example.com", "password123"

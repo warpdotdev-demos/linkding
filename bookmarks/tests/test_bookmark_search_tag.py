@@ -1,3 +1,5 @@
+import urllib.parse
+
 from bs4 import BeautifulSoup
 from django.template import RequestContext, Template
 from django.test import RequestFactory, TestCase
@@ -181,6 +183,78 @@ class BookmarkSearchTagTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         self.assertSelect(preferences_form, "sort", BookmarkSearch.SORT_TITLE_ASC)
         self.assertNoRadioGroup(preferences_form, "shared")
         self.assertNoRadioGroup(preferences_form, "unread")
+
+    def test_scope_control_offers_global_search_when_bundle_selected(self):
+        bundle = self.setup_bundle(name="Favorites")
+        url = f"/test?q=foo&sort=title_asc&bundle={bundle.id}&page=2&details=1"
+        rendered_template = self.render_template(url)
+        soup = self.make_soup(rendered_template)
+        scope_control = soup.select_one("div.search-scope")
+
+        self.assertIsNotNone(scope_control)
+        self.assertEqual(
+            scope_control.select_one(".scope-label").text.strip(), "In Favorites"
+        )
+
+        action = scope_control.select_one("a.scope-action")
+        self.assertEqual(action.text.strip(), "Search all bookmarks")
+
+        query_params = urllib.parse.parse_qs(
+            urllib.parse.urlparse(action["href"]).query
+        )
+        self.assertEqual(query_params["scope"], [BookmarkSearch.SCOPE_ALL])
+        self.assertEqual(query_params["q"], ["foo"])
+        self.assertEqual(query_params["sort"], [BookmarkSearch.SORT_TITLE_ASC])
+        self.assertEqual(query_params["bundle"], [str(bundle.id)])
+        self.assertNotIn("page", query_params)
+        self.assertNotIn("details", query_params)
+
+    def test_scope_control_offers_return_to_bundle_in_global_scope(self):
+        bundle = self.setup_bundle(name="Favorites")
+        url = f"/test?q=foo&sort=title_asc&bundle={bundle.id}&scope=all&page=2"
+        rendered_template = self.render_template(url)
+        soup = self.make_soup(rendered_template)
+        scope_control = soup.select_one("div.search-scope")
+
+        self.assertIsNotNone(scope_control)
+        self.assertEqual(
+            scope_control.select_one(".scope-label").text.strip(), "All bookmarks"
+        )
+
+        action = scope_control.select_one("a.scope-action")
+        self.assertEqual(action.text.strip(), "Back to Favorites")
+
+        query_params = urllib.parse.parse_qs(
+            urllib.parse.urlparse(action["href"]).query
+        )
+        self.assertNotIn("scope", query_params)
+        self.assertEqual(query_params["q"], ["foo"])
+        self.assertEqual(query_params["sort"], [BookmarkSearch.SORT_TITLE_ASC])
+        self.assertEqual(query_params["bundle"], [str(bundle.id)])
+        self.assertNotIn("page", query_params)
+
+    def test_scope_control_absent_without_bundle(self):
+        rendered_template = self.render_template("/test?q=foo")
+        soup = self.make_soup(rendered_template)
+
+        self.assertIsNone(soup.select_one("div.search-scope"))
+
+    def test_scope_is_kept_when_submitting_a_search(self):
+        bundle = self.setup_bundle()
+        url = f"/test?q=foo&bundle={bundle.id}&scope=all"
+        rendered_template = self.render_template(url)
+        soup = self.make_soup(rendered_template)
+        search_form = soup.select_one("form#search")
+
+        self.assertHiddenInput(search_form, "scope", BookmarkSearch.SCOPE_ALL)
+        self.assertHiddenInput(search_form, "bundle", str(bundle.id))
+
+        # not submitted when the scope is the default
+        rendered_template = self.render_template(f"/test?q=foo&bundle={bundle.id}")
+        soup = self.make_soup(rendered_template)
+        search_form = soup.select_one("form#search")
+
+        self.assertNoHiddenInput(search_form, "scope")
 
     def test_modified_indicator(self):
         # Without modifications
