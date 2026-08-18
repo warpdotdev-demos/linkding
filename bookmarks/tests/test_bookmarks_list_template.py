@@ -1074,8 +1074,11 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         self.setup_bookmark(title="Test Bookmark")
         html = self.render_template(url="/bookmarks?q=nonexistent")
 
+        # A zero-result search shows a real no-results message, not the
+        # first-run screen
+        self.assertInHTML('<p class="empty-title h5">No bookmarks found</p>', html)
         self.assertInHTML(
-            '<p class="empty-title h5">You have no bookmarks yet</p>', html
+            '<p class="empty-title h5">You have no bookmarks yet</p>', html, count=0
         )
 
     def test_empty_state_with_invalid_query(self):
@@ -1093,10 +1096,60 @@ class BookmarkListTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         self.setup_bookmark()
         html = self.render_template(url="/bookmarks?q=(test")
 
-        # With legacy search, search queries are not validated
-        self.assertInHTML(
-            '<p class="empty-title h5">You have no bookmarks yet</p>', html
+        # With legacy search, search queries are not validated, and since the
+        # query is a modification with zero results, shows the no-results
+        # message rather than the first-run screen
+        self.assertInHTML('<p class="empty-title h5">No bookmarks found</p>', html)
+
+    def test_empty_state_with_bundle_no_results_shows_widen_link(self):
+        self.setup_bookmark(title="Test Bookmark")
+        bundle = self.setup_bundle(search="nonexistent")
+        html = self.render_template(url=f"/bookmarks?bundle={bundle.id}")
+
+        self.assertInHTML('<p class="empty-title h5">No bookmarks found</p>', html)
+        soup = self.make_soup(html)
+        widen_link = soup.select_one(".empty a")
+        self.assertIsNotNone(widen_link)
+        self.assertIn("all_bookmarks=yes", widen_link.attrs["href"])
+
+    def test_scope_indicator_hidden_without_bundle(self):
+        self.setup_bookmark()
+        html = self.render_template()
+
+        soup = self.make_soup(html)
+        self.assertIsNone(soup.select_one(".search-scope-info"))
+
+    def test_scope_indicator_shown_when_bundle_selected(self):
+        self.setup_bookmark(title="Matching Bookmark")
+        bundle = self.setup_bundle(name="My Bundle", search="Matching")
+        html = self.render_template(url=f"/bookmarks?bundle={bundle.id}&page=2")
+
+        soup = self.make_soup(html)
+        indicator = soup.select_one(".search-scope-info")
+        self.assertIsNotNone(indicator)
+        self.assertIn("My Bundle", indicator.text)
+
+        toggle_link = indicator.select_one("a")
+        self.assertEqual("Search all bookmarks", toggle_link.text.strip())
+        self.assertIn("all_bookmarks=yes", toggle_link.attrs["href"])
+        self.assertNotIn("page=", toggle_link.attrs["href"])
+
+    def test_scope_indicator_shown_when_all_bookmarks_active(self):
+        self.setup_bookmark(title="Matching Bookmark")
+        bundle = self.setup_bundle(name="My Bundle", search="Matching")
+        html = self.render_template(
+            url=f"/bookmarks?bundle={bundle.id}&all_bookmarks=yes&page=2"
         )
+
+        soup = self.make_soup(html)
+        indicator = soup.select_one(".search-scope-info")
+        self.assertIsNotNone(indicator)
+        self.assertIn("My Bundle", indicator.text)
+
+        toggle_link = indicator.select_one("a")
+        self.assertEqual("Search within bundle", toggle_link.text.strip())
+        self.assertNotIn("all_bookmarks", toggle_link.attrs["href"])
+        self.assertNotIn("page=", toggle_link.attrs["href"])
 
     def test_pagination_is_not_sticky_by_default(self):
         self.setup_bookmark()

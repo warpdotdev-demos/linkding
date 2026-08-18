@@ -207,6 +207,25 @@ class BookmarkListContext:
         self.query_is_valid = request_context.query_is_valid
         self.query_error_message = request_context.query_error_message
 
+        # Scope indicator: whether the search is currently widened to all
+        # bookmarks, and the link to toggle that, when a bundle is selected.
+        self.bundle = search.bundle
+        self.is_all_bookmarks = search.all_bookmarks == BookmarkSearch.ALL_BOOKMARKS_YES
+        if self.bundle:
+            if self.is_all_bookmarks:
+                self.scope_toggle_url = request_context.get_url(
+                    request_context.index_url,
+                    remove={"all_bookmarks", "page"},
+                )
+            else:
+                self.scope_toggle_url = request_context.get_url(
+                    request_context.index_url,
+                    add={"all_bookmarks": BookmarkSearch.ALL_BOOKMARKS_YES},
+                    remove={"page"},
+                )
+        else:
+            self.scope_toggle_url = None
+
         query_set = request_context.get_bookmark_query_set(self.search)
         page_number = request.GET.get("page")
         paginator = Paginator(query_set, user_profile.items_per_page)

@@ -235,10 +235,18 @@ class BookmarkSearch:
     FILTER_UNREAD_YES = "yes"
     FILTER_UNREAD_NO = "no"
 
+    # Widens a search that would otherwise be scoped to the selected bundle to
+    # cover all of the user's bookmarks instead. This is a per-search option,
+    # not a persisted preference, so it is intentionally excluded from
+    # `preferences` below.
+    ALL_BOOKMARKS_OFF = "off"
+    ALL_BOOKMARKS_YES = "yes"
+
     params = [
         "q",
         "user",
         "bundle",
+        "all_bookmarks",
         "sort",
         "shared",
         "unread",
@@ -250,6 +258,7 @@ class BookmarkSearch:
         "q": "",
         "user": "",
         "bundle": None,
+        "all_bookmarks": ALL_BOOKMARKS_OFF,
         "sort": SORT_ADDED_DESC,
         "shared": FILTER_SHARED_OFF,
         "unread": FILTER_UNREAD_OFF,
@@ -262,6 +271,7 @@ class BookmarkSearch:
         q: str = None,
         user: str = None,
         bundle: BookmarkBundle = None,
+        all_bookmarks: str = None,
         sort: str = None,
         shared: str = None,
         unread: str = None,
@@ -278,6 +288,7 @@ class BookmarkSearch:
         self.q = q or self.defaults["q"]
         self.user = user or self.defaults["user"]
         self.bundle = bundle or self.defaults["bundle"]
+        self.all_bookmarks = all_bookmarks or self.defaults["all_bookmarks"]
         self.sort = sort or self.defaults["sort"]
         self.shared = shared or self.defaults["shared"]
         self.unread = unread or self.defaults["unread"]

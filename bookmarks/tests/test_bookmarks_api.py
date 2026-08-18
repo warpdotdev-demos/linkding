@@ -152,6 +152,23 @@ class BookmarksApiTestCase(LinkdingApiTestCase, BookmarkFactoryMixin):
         )
         self.assertBookmarkListEqual(response.data["results"], bookmarks)
 
+    def test_list_bookmarks_ignores_all_bookmarks_param(self):
+        # The all_bookmarks option that widens a bundle-scoped search in the
+        # UI must not be reachable through the REST API; the bundle filter
+        # must stay in effect regardless.
+        self.authenticate()
+        search_value = self.get_random_string()
+        bookmarks = self.setup_numbered_bookmarks(5, prefix=search_value)
+        self.setup_numbered_bookmarks(5)
+        bundle = self.setup_bundle(search=search_value)
+
+        response = self.get(
+            reverse("linkding:bookmark-list")
+            + f"?bundle={bundle.id}&all_bookmarks=yes",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], bookmarks)
+
     def test_list_bookmarks_filter_unread(self):
         self.authenticate()
         unread_bookmarks = self.setup_numbered_bookmarks(5, unread=True)
@@ -270,6 +287,22 @@ class BookmarksApiTestCase(LinkdingApiTestCase, BookmarkFactoryMixin):
 
         response = self.get(
             reverse("linkding:bookmark-archived") + f"?bundle={bundle.id}",
+            expected_status_code=status.HTTP_200_OK,
+        )
+        self.assertBookmarkListEqual(response.data["results"], archived_bookmarks)
+
+    def test_list_archived_bookmarks_ignores_all_bookmarks_param(self):
+        self.authenticate()
+        search_value = self.get_random_string()
+        archived_bookmarks = self.setup_numbered_bookmarks(
+            5, archived=True, prefix=search_value
+        )
+        self.setup_numbered_bookmarks(5, archived=True)
+        bundle = self.setup_bundle(search=search_value)
+
+        response = self.get(
+            reverse("linkding:bookmark-archived")
+            + f"?bundle={bundle.id}&all_bookmarks=yes",
             expected_status_code=status.HTTP_200_OK,
         )
         self.assertBookmarkListEqual(response.data["results"], archived_bookmarks)

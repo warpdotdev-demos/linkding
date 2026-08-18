@@ -124,6 +124,21 @@
   }
 }
 
+/* Search scope indicator */
+.search-scope-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--unit-2);
+  color: var(--secondary-text-color);
+  font-size: var(--font-size-sm);
+  margin-top: var(--unit-3);
+
+  & a {
+    white-space: nowrap;
+  }
+}
+
 /* Bookmark list */
 @keyframes appear {
   0% {

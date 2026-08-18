@@ -19,6 +19,7 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
         self.assertEqual(search.q, "")
         self.assertEqual(search.user, "")
         self.assertEqual(search.bundle, None)
+        self.assertEqual(search.all_bookmarks, BookmarkSearch.ALL_BOOKMARKS_OFF)
         self.assertEqual(search.sort, BookmarkSearch.SORT_ADDED_DESC)
         self.assertEqual(search.shared, BookmarkSearch.FILTER_SHARED_OFF)
         self.assertEqual(search.unread, BookmarkSearch.FILTER_UNREAD_OFF)
@@ -37,13 +38,15 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
         bundle = self.setup_bundle()
         request = MockRequest(self.get_or_create_test_user())
         query_dict = QueryDict(
-            f"q=search query&sort=title_asc&user=user123&bundle={bundle.id}&shared=yes&unread=yes"
+            f"q=search query&sort=title_asc&user=user123&bundle={bundle.id}"
+            f"&all_bookmarks=yes&shared=yes&unread=yes"
         )
 
         search = BookmarkSearch.from_request(request, query_dict)
         self.assertEqual(search.q, "search query")
         self.assertEqual(search.user, "user123")
         self.assertEqual(search.bundle, bundle)
+        self.assertEqual(search.all_bookmarks, BookmarkSearch.ALL_BOOKMARKS_YES)
         self.assertEqual(search.sort, BookmarkSearch.SORT_TITLE_ASC)
         self.assertEqual(search.shared, BookmarkSearch.FILTER_SHARED_SHARED)
         self.assertEqual(search.unread, BookmarkSearch.FILTER_UNREAD_YES)
@@ -118,6 +121,7 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
             sort=BookmarkSearch.SORT_ADDED_ASC,
             user="user123",
             bundle=bundle,
+            all_bookmarks=BookmarkSearch.ALL_BOOKMARKS_YES,
             shared=BookmarkSearch.FILTER_SHARED_SHARED,
             unread=BookmarkSearch.FILTER_UNREAD_YES,
         )
@@ -128,6 +132,7 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
                 "sort": BookmarkSearch.SORT_ADDED_ASC,
                 "user": "user123",
                 "bundle": bundle.id,
+                "all_bookmarks": BookmarkSearch.ALL_BOOKMARKS_YES,
                 "shared": BookmarkSearch.FILTER_SHARED_SHARED,
                 "unread": BookmarkSearch.FILTER_UNREAD_YES,
             },
@@ -201,12 +206,14 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
             sort=BookmarkSearch.SORT_ADDED_ASC,
             user="user123",
             bundle=bundle,
+            all_bookmarks=BookmarkSearch.ALL_BOOKMARKS_YES,
             shared=BookmarkSearch.FILTER_SHARED_SHARED,
             unread=BookmarkSearch.FILTER_UNREAD_YES,
         )
         modified_params = bookmark_search.modified_params
         self.assertCountEqual(
-            modified_params, ["q", "sort", "user", "bundle", "shared", "unread"]
+            modified_params,
+            ["q", "sort", "user", "bundle", "all_bookmarks", "shared", "unread"],
         )
 
         # preferences are not modified params
@@ -263,6 +270,18 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
         )
         self.assertTrue(bookmark_search.has_modifications)
 
+        # all_bookmarks is off by default
+        bookmark_search = BookmarkSearch(
+            all_bookmarks=BookmarkSearch.ALL_BOOKMARKS_OFF
+        )
+        self.assertFalse(bookmark_search.has_modifications)
+
+        # all_bookmarks alone counts as a modification
+        bookmark_search = BookmarkSearch(
+            all_bookmarks=BookmarkSearch.ALL_BOOKMARKS_YES
+        )
+        self.assertTrue(bookmark_search.has_modifications)
+
     def test_preferences_dict(self):
         # no params
         bookmark_search = BookmarkSearch()
@@ -301,3 +320,9 @@ class BookmarkSearchModelTest(TestCase, BookmarkFactoryMixin):
                 "unread": BookmarkSearch.FILTER_UNREAD_OFF,
             },
         )
+
+        # all_bookmarks is never persisted as a preference, even when set
+        bookmark_search = BookmarkSearch(
+            bundle=bundle, all_bookmarks=BookmarkSearch.ALL_BOOKMARKS_YES
+        )
+        self.assertNotIn("all_bookmarks", bookmark_search.preferences_dict)

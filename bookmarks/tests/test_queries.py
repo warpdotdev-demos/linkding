@@ -1310,6 +1310,60 @@ class QueriesBasicTestCase(TestCase, BookmarkFactoryMixin):
         )
         self.assertQueryResult(query, [matching_bookmarks])
 
+    def test_query_bookmarks_with_bundle_and_all_bookmarks_ignores_bundle(self):
+        bundle = self.setup_bundle(search="search_term_A")
+
+        matching_bookmark = self.setup_bookmark(title="search_term_A content")
+        other_bookmark = self.setup_bookmark(title="unrelated content")
+
+        # Without all_bookmarks, only the bundle-matching bookmark is returned
+        query = queries.query_bookmarks(
+            self.user, self.profile, BookmarkSearch(q="", bundle=bundle)
+        )
+        self.assertQueryResult(query, [[matching_bookmark]])
+
+        # With all_bookmarks, the bundle filter is ignored and all bookmarks
+        # are returned, even though a bundle is still selected
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(
+                q="",
+                bundle=bundle,
+                all_bookmarks=BookmarkSearch.ALL_BOOKMARKS_YES,
+            ),
+        )
+        self.assertQueryResult(query, [[matching_bookmark, other_bookmark]])
+
+    def test_query_bookmarks_with_bundle_and_search_and_all_bookmarks(self):
+        bundle = self.setup_bundle(search="bundle_term")
+
+        matching_bookmark = self.setup_bookmark(title="search_term content")
+        self.setup_bookmark(title="unrelated content")
+
+        # The search term is still applied even when the bundle is ignored
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(
+                q="search_term",
+                bundle=bundle,
+                all_bookmarks=BookmarkSearch.ALL_BOOKMARKS_YES,
+            ),
+        )
+        self.assertQueryResult(query, [[matching_bookmark]])
+
+    def test_query_bookmarks_with_all_bookmarks_and_no_bundle(self):
+        bookmark = self.setup_bookmark()
+
+        # all_bookmarks has no effect when no bundle is selected
+        query = queries.query_bookmarks(
+            self.user,
+            self.profile,
+            BookmarkSearch(q="", all_bookmarks=BookmarkSearch.ALL_BOOKMARKS_YES),
+        )
+        self.assertQueryResult(query, [[bookmark]])
+
     def test_query_bookmarks_with_search_and_bundle_search_terms(self):
         bundle = self.setup_bundle(search="bundle_term_B")
         search = BookmarkSearch(q="search_term_A", bundle=bundle)
