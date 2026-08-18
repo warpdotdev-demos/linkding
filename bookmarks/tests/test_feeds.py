@@ -279,14 +279,27 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
     def test_public_shared_with_user_parameter_returns_publicly_shared_bookmarks_only(
         self,
     ):
-        user = self.setup_user(name="alice", enable_sharing=True)
-        self.setup_bookmark(shared=True, user=user)
+        # shared bookmark, but the owner has public sharing disabled
+        user1 = self.setup_user(name="alice", enable_sharing=True)
+        self.setup_bookmark(shared=True, user=user1)
 
-        response = self.client.get(
-            reverse("linkding:feeds.public_shared") + "?user=alice"
+        # shared bookmark, but the owner has sharing disabled altogether
+        user2 = self.setup_user(name="bob", enable_public_sharing=True)
+        self.setup_bookmark(shared=True, user=user2)
+
+        # owner shares publicly, but the bookmark itself is not shared
+        user3 = self.setup_user(
+            name="carol", enable_sharing=True, enable_public_sharing=True
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<item>", count=0)
+        self.setup_bookmark(shared=False, user=user3)
+
+        feed_url = reverse("linkding:feeds.public_shared")
+
+        for username in [user1.username, user2.username, user3.username]:
+            with self.subTest(username):
+                response = self.client.get(feed_url + f"?user={username}")
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "<item>", count=0)
 
     def test_public_shared_returns_404_for_unknown_user(self):
         response = self.client.get(
@@ -315,13 +328,24 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
         )
 
     def test_token_feeds_ignore_user_parameter(self):
-        other_user = self.setup_user(name="alice")
-        self.setup_bookmark(shared=True)
+        user = self.get_or_create_test_user()
+        user.profile.enable_sharing = True
+        user.profile.save()
+        own_bookmark = self.setup_bookmark(unread=True, shared=True, description="test")
 
-        for feed_name, expected_title in [
-            ("feeds.all", "All bookmarks (testuser)"),
-            ("feeds.unread", "Unread bookmarks (testuser)"),
-            ("feeds.shared", "Shared bookmarks"),
+        other_user = self.setup_user(name="alice", enable_sharing=True)
+        other_user_bookmark = self.setup_bookmark(
+            unread=True, shared=True, user=other_user, description="test"
+        )
+
+        for feed_name, expected_title, expected_bookmarks in [
+            ("feeds.all", "All bookmarks (testuser)", [own_bookmark]),
+            ("feeds.unread", "Unread bookmarks (testuser)", [own_bookmark]),
+            (
+                "feeds.shared",
+                "Shared bookmarks",
+                [own_bookmark, other_user_bookmark],
+            ),
         ]:
             with self.subTest(feed_name):
                 response = self.client.get(
@@ -330,6 +354,7 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, f"<title>{expected_title}</title>")
+                self.assertFeedItems(response, expected_bookmarks)
 
     def test_with_query(self):
         tag1 = self.setup_tag()

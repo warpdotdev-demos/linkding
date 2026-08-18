@@ -661,7 +661,11 @@ class BookmarkSharedViewTestCase(
         self.assertEqual(feed.attrs["href"], reverse("linkding:feeds.public_shared"))
 
     def test_public_shared_rss_feed_keeps_user_filter(self):
-        url = reverse("linkding:bookmarks.shared") + "?user=alice"
+        user = self.setup_user(
+            name="alice", enable_sharing=True, enable_public_sharing=True
+        )
+
+        url = reverse("linkding:bookmarks.shared") + f"?user={user.username}"
         response = self.client.get(url)
         soup = self.make_soup(response.content.decode())
 
@@ -671,6 +675,17 @@ class BookmarkSharedViewTestCase(
             feed.attrs["href"],
             reverse("linkding:feeds.public_shared") + "?user=alice",
         )
+
+    def test_public_shared_rss_feed_ignores_unknown_user_filter(self):
+        # this view ignores an unknown user, but the feed returns a 404 for it,
+        # so the feed URL must not advertise the filter
+        url = reverse("linkding:bookmarks.shared") + "?user=unknown"
+        response = self.client.get(url)
+        soup = self.make_soup(response.content.decode())
+
+        feed = soup.select_one('head link[type="application/rss+xml"]')
+        self.assertIsNotNone(feed)
+        self.assertEqual(feed.attrs["href"], reverse("linkding:feeds.public_shared"))
 
     def test_tag_menu_visible_for_authenticated_user(self):
         self.authenticate()

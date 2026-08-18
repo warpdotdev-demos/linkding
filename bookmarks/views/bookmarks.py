@@ -16,6 +16,7 @@ from bookmarks.forms import BookmarkForm
 from bookmarks.models import (
     Bookmark,
     BookmarkSearch,
+    User,
 )
 from bookmarks.services import assets as asset_actions
 from bookmarks.services import tasks
@@ -131,9 +132,11 @@ def shared(request: HttpRequest):
     )
     user_list = contexts.UserListContext(request, search)
     # Keep the user filter in the feed URL, so that subscribing from a feed
-    # reader results in a feed for that user instead of the global one
+    # reader results in a feed for that user instead of the global one. Unlike
+    # this view, the feed rejects unknown users, so only advertise the filter
+    # for a user that actually exists
     rss_feed_url = reverse("linkding:feeds.public_shared")
-    if search.user:
+    if search.user and User.objects.filter(username=search.user).exists():
         rss_feed_url += "?" + urllib.parse.urlencode({"user": search.user})
     return render_bookmarks_view(
         request,
