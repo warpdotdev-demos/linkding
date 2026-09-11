@@ -1,10 +1,12 @@
 import unicodedata
 from dataclasses import dataclass
 
+from django.contrib.auth.models import User
 from django.contrib.syndication.views import Feed
 from django.db.models import QuerySet, prefetch_related_objects
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.urls import reverse
+from django.utils.feedgenerator import Atom1Feed
 
 from bookmarks import queries
 from bookmarks.models import Bookmark, BookmarkSearch, FeedToken, UserProfile
@@ -15,6 +17,7 @@ from bookmarks.views import access
 class FeedContext:
     request: HttpRequest
     feed_token: FeedToken | None
+    user: User | None
     query_set: QuerySet[Bookmark]
 
 
@@ -28,13 +31,20 @@ def sanitize(text: str):
     )
 
 
+def qualify_with_user(text: str, user: User | None) -> str:
+    return f"{text} by {user.username}" if user else text
+
+
 class BaseBookmarksFeed(Feed):
+    # Whether `?bundle=<id>` is honored by this feed. Only a feed token
+    # owner's own `all`/`unread` feeds support scoping to one of their
+    # bundles; shared feeds reject it outright so the parameter can't be
+    # used to probe for the existence of someone else's bundle.
+    supports_bundle = False
+
     def get_object(self, request, feed_key: str | None):
         feed_token = FeedToken.objects.get(key__exact=feed_key) if feed_key else None
-        bundle = None
-        bundle_id = request.GET.get("bundle")
-        if bundle_id:
-            bundle = access.bundle_read(request, bundle_id)
+        bundle = self.get_bundle(request, feed_token)
 
         search = BookmarkSearch(
             q=request.GET.get("q", ""),
@@ -42,10 +52,29 @@ class BaseBookmarksFeed(Feed):
             shared=request.GET.get("shared", ""),
             bundle=bundle,
         )
-        query_set = self.get_query_set(feed_token, search)
-        return FeedContext(request, feed_token, query_set)
+        user = self.get_user(request, feed_token)
+        query_set = self.get_query_set(feed_token, search, user)
+        return FeedContext(request, feed_token, user, query_set)
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
+    def get_bundle(self, request, feed_token: FeedToken | None):
+        bundle_id = request.GET.get("bundle")
+        if not bundle_id:
+            return None
+        if not self.supports_bundle:
+            # Don't reveal whether a bundle exists on feeds that don't
+            # support scoping to one.
+            raise Http404("Bundle does not exist")
+        # Authorize the bundle against the feed token's owner rather than
+        # the logged-in session user, since a feed is typically requested
+        # by an external reader that only presents the token in the URL.
+        return access.bundle_read_for_user(feed_token.user, bundle_id)
+
+    def get_user(self, request, feed_token: FeedToken | None) -> User | None:
+        return None
+
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
         raise NotImplementedError
 
     def items(self, context: FeedContext):
@@ -73,19 +102,32 @@ class BaseBookmarksFeed(Feed):
 class AllBookmarksFeed(BaseBookmarksFeed):
     title = "All bookmarks"
     description = "All bookmarks"
+    supports_bundle = True
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
         return queries.query_bookmarks(feed_token.user, feed_token.user.profile, search)
 
     def link(self, context: FeedContext):
         return reverse("linkding:feeds.all", args=[context.feed_token.key])
 
 
+class AllBookmarksAtomFeed(AllBookmarksFeed):
+    feed_type = Atom1Feed
+
+    def link(self, context: FeedContext):
+        return reverse("linkding:feeds.all_atom", args=[context.feed_token.key])
+
+
 class UnreadBookmarksFeed(BaseBookmarksFeed):
     title = "Unread bookmarks"
     description = "All unread bookmarks"
+    supports_bundle = True
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
         return queries.query_bookmarks(
             feed_token.user, feed_token.user.profile, search
         ).filter(unread=True)
@@ -94,28 +136,77 @@ class UnreadBookmarksFeed(BaseBookmarksFeed):
         return reverse("linkding:feeds.unread", args=[context.feed_token.key])
 
 
-class SharedBookmarksFeed(BaseBookmarksFeed):
-    title = "Shared bookmarks"
-    description = "All shared bookmarks"
+class UnreadBookmarksAtomFeed(UnreadBookmarksFeed):
+    feed_type = Atom1Feed
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
+    def link(self, context: FeedContext):
+        return reverse("linkding:feeds.unread_atom", args=[context.feed_token.key])
+
+
+class SharedBookmarksFeed(BaseBookmarksFeed):
+    base_title = "Shared bookmarks"
+    base_description = "All shared bookmarks"
+
+    def get_user(self, request, feed_token: FeedToken | None) -> User | None:
+        username = request.GET.get("user")
+        if not username:
+            return None
+        return User.objects.get(username=username)
+
+    def title(self, context: FeedContext):
+        return qualify_with_user(self.base_title, context.user)
+
+    def description(self, context: FeedContext):
+        return qualify_with_user(self.base_description, context.user)
+
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
         return queries.query_shared_bookmarks(
-            None, feed_token.user.profile, search, False
+            user, feed_token.user.profile, search, False
         )
 
     def link(self, context: FeedContext):
         return reverse("linkding:feeds.shared", args=[context.feed_token.key])
 
 
+class SharedBookmarksAtomFeed(SharedBookmarksFeed):
+    feed_type = Atom1Feed
+
+    def link(self, context: FeedContext):
+        return reverse("linkding:feeds.shared_atom", args=[context.feed_token.key])
+
+
 class PublicSharedBookmarksFeed(BaseBookmarksFeed):
-    title = "Public shared bookmarks"
-    description = "All public shared bookmarks"
+    base_title = "Public shared bookmarks"
+    base_description = "All public shared bookmarks"
 
     def get_object(self, request):
         return super().get_object(request, None)
 
-    def get_query_set(self, feed_token: FeedToken, search: BookmarkSearch):
-        return queries.query_shared_bookmarks(None, UserProfile(), search, True)
+    def get_user(self, request, feed_token: FeedToken | None) -> User | None:
+        username = request.GET.get("user")
+        if not username:
+            return None
+        return User.objects.get(username=username)
+
+    def title(self, context: FeedContext):
+        return qualify_with_user(self.base_title, context.user)
+
+    def description(self, context: FeedContext):
+        return qualify_with_user(self.base_description, context.user)
+
+    def get_query_set(
+        self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
+    ):
+        return queries.query_shared_bookmarks(user, UserProfile(), search, True)
 
     def link(self, context: FeedContext):
         return reverse("linkding:feeds.public_shared")
+
+
+class PublicSharedBookmarksAtomFeed(PublicSharedBookmarksFeed):
+    feed_type = Atom1Feed
+
+    def link(self, context: FeedContext):
+        return reverse("linkding:feeds.public_shared_atom")

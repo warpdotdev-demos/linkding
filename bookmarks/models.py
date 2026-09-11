@@ -493,11 +493,12 @@ class FeedToken(models.Model):
     """
 
     key = models.CharField(max_length=40, primary_key=True)
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         User,
-        related_name="feed_token",
+        related_name="feed_tokens",
         on_delete=models.CASCADE,
     )
+    name = models.CharField(max_length=128, blank=False)
     created = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -510,7 +511,7 @@ class FeedToken(models.Model):
         return binascii.hexlify(os.urandom(20)).decode()
 
     def __str__(self):
-        return self.key
+        return f"{self.name} ({self.user.username})"
 
 
 class ApiToken(models.Model):

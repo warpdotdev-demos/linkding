@@ -183,26 +183,112 @@
       })();
     </script>
     </turbo-frame>
-    <section aria-labelledby="rss-feeds-heading">
-      <h2 id="rss-feeds-heading">RSS Feeds</h2>
-      <p>The following URLs provide RSS feeds for your bookmarks:</p>
+    <turbo-frame id="feed-section">
+    <section aria-labelledby="feeds-heading">
+      <h2 id="feeds-heading">Feeds</h2>
+      {% if feed_success_message %}
+        <div class="toast toast-success mb-2">{{ feed_success_message }}</div>
+      {% endif %}
+      <p>
+        Feed tokens provide RSS and Atom feeds for your bookmarks. <strong>Please treat feed tokens as you would any
+        other credential.</strong> Any party with access to a feed URL can read the bookmarks it exposes.
+      </p>
+      {% if feed_tokens %}
+        <form method="post"
+              action="{% url 'linkding:settings.integrations.delete_feed_token' %}"
+              data-turbo-frame="feed-section">
+          <table class="table crud-table mb-6">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Created</th>
+                <th>Feeds</th>
+                <th class="actions">
+                  <span class="text-assistive">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for token in feed_tokens %}
+                <tr>
+                  <td>{{ token.name }}</td>
+                  <td>{{ token.created|date:"M d, Y H:i" }}</td>
+                  <td>
+                    <ul style="list-style-position: outside;">
+                      <li>
+                        All bookmarks:
+                        <a target="_blank" href="{% url 'linkding:feeds.all' token.key %}">RSS</a>
+                        <button type="button"
+                                class="btn btn-link btn-sm btn-copy-url"
+                                aria-label="Copy All bookmarks RSS URL">Copy</button>
+                        /
+                        <a target="_blank" href="{% url 'linkding:feeds.all_atom' token.key %}">Atom</a>
+                        <button type="button"
+                                class="btn btn-link btn-sm btn-copy-url"
+                                aria-label="Copy All bookmarks Atom URL">Copy</button>
+                      </li>
+                      <li>
+                        Unread bookmarks:
+                        <a target="_blank" href="{% url 'linkding:feeds.unread' token.key %}">RSS</a>
+                        <button type="button"
+                                class="btn btn-link btn-sm btn-copy-url"
+                                aria-label="Copy Unread bookmarks RSS URL">Copy</button>
+                        /
+                        <a target="_blank"
+                           href="{% url 'linkding:feeds.unread_atom' token.key %}">Atom</a>
+                        <button type="button"
+                                class="btn btn-link btn-sm btn-copy-url"
+                                aria-label="Copy Unread bookmarks Atom URL">Copy</button>
+                      </li>
+                      <li>
+                        Shared bookmarks:
+                        <a target="_blank" href="{% url 'linkding:feeds.shared' token.key %}">RSS</a>
+                        <button type="button"
+                                class="btn btn-link btn-sm btn-copy-url"
+                                aria-label="Copy Shared bookmarks RSS URL">Copy</button>
+                        /
+                        <a target="_blank"
+                           href="{% url 'linkding:feeds.shared_atom' token.key %}">Atom</a>
+                        <button type="button"
+                                class="btn btn-link btn-sm btn-copy-url"
+                                aria-label="Copy Shared bookmarks Atom URL">Copy</button>
+                      </li>
+                    </ul>
+                  </td>
+                  <td class="actions">
+                    {% csrf_token %}
+                    <button data-confirm
+                            name="token_key"
+                            value="{{ token.key }}"
+                            type="submit"
+                            class="btn btn-link">Delete</button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </form>
+      {% endif %}
+      <a class="btn"
+         href="{% url 'linkding:settings.integrations.create_feed_token' %}"
+         data-turbo-frame="feed-modal">Create feed token</a>
+      <h3>Public shared feed</h3>
       <ul style="list-style-position: outside;">
         <li>
-          <a target="_blank" href="{{ all_feed_url }}">All bookmarks</a>
-        </li>
-        <li>
-          <a target="_blank" href="{{ unread_feed_url }}">Unread bookmarks</a>
-        </li>
-        <li>
-          <a target="_blank" href="{{ shared_feed_url }}">Shared bookmarks</a>
-        </li>
-        <li>
-          <a target="_blank" href="{{ public_shared_feed_url }}">Public shared bookmarks</a>
+          <a target="_blank" href="{{ public_shared_feed_url }}">RSS</a>
+          <button type="button"
+                  class="btn btn-link btn-sm btn-copy-url"
+                  aria-label="Copy Public shared feed RSS URL">Copy</button>
+          /
+          <a target="_blank" href="{{ public_shared_feed_atom_url }}">Atom</a>
+          <button type="button"
+                  class="btn btn-link btn-sm btn-copy-url"
+                  aria-label="Copy Public shared feed Atom URL">Copy</button>
           <br>
-          <span class="text-small text-secondary">The public shared feed does not contain an authentication token and can be shared with other people. Only shows shared bookmarks from users who have explicitly enabled public sharing.</span>
+          <span class="text-small text-secondary">The public shared feed does not contain an authentication token and can be shared with other people. Only shows shared bookmarks from users who have explicitly enabled public sharing. Add a <code>user</code> parameter to limit the feed to a single user's public bookmarks, e.g. <code>?user=jane</code>.</span>
         </li>
       </ul>
-      <p>All URLs support the following URL parameters:</p>
+      <p>All feed URLs above support the following URL parameters:</p>
       <ul style="list-style-position: outside;">
         <li>
           A <code>limit</code> parameter for specifying the maximum number of bookmarks to include in the feed. By
@@ -220,15 +306,41 @@
           A <code>shared</code> parameter for filtering for shared or unshared bookmarks. Use <code>yes</code> for
           shared bookmarks and <code>no</code> for unshared bookmarks.
         </li>
+        <li>
+          A <code>bundle</code> parameter for scoping your <em>All bookmarks</em> and <em>Unread bookmarks</em> feeds
+          to one of your bundles, by ID. Not supported on the shared feeds.
+        </li>
+        <li>
+          A <code>user</code> parameter for scoping the shared feeds to a single user's shared bookmarks, by
+          username. Returns a 404 for an unknown username. Not supported on your own bookmarks feeds.
+        </li>
       </ul>
       <p>
-        <strong>Please note that these URLs include an authentication token that should be treated like any other
-        credential.</strong>
-        Any party with access to these URLs can read all your bookmarks.
-        If you think that a URL was compromised you can delete the feed token for your user in the <a target="_blank"
-    href="{% url 'admin:bookmarks_feedtoken_changelist' %}">admin panel</a>.
-        After deleting the feed token, new URLs will be generated when you reload this settings page.
+        <strong>Deleting a feed token immediately revokes every URL built with it,</strong> without affecting your
+        other feed tokens.
       </p>
     </section>
+    <turbo-frame id="feed-modal"></turbo-frame>
+    <script>
+      (function init() {
+        // Copy feed URL to clipboard
+        document.querySelectorAll('.btn-copy-url').forEach(function(button) {
+          button.addEventListener('click', () => {
+            const link = button.previousElementSibling;
+            const url = link.href;
+            navigator.clipboard.writeText(url).then(() => {
+              const originalText = button.textContent;
+              button.textContent = 'Copied!';
+              setTimeout(() => {
+                button.textContent = originalText;
+              }, 2000);
+            }, (err) => {
+              console.error('Could not copy text: ', err);
+            });
+          });
+        });
+      })();
+    </script>
+    </turbo-frame>
   </main>
 {% endblock %}

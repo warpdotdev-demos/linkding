@@ -60,6 +60,11 @@
   <meta name="turbo-cache-control" content="no-preview">
   {% if not request.global_settings.enable_link_prefetch %}<meta name="turbo-prefetch" content="false">{% endif %}
   {% if rss_feed_url %}<link rel="alternate" type="application/rss+xml" href="{{ rss_feed_url }}" />{% endif %}
+  {% if atom_feed_url %}
+    <link rel="alternate"
+          type="application/atom+xml"
+          href="{{ atom_feed_url }}" />
+  {% endif %}
   <script src="{% static "bundle.js" %}?v={{ app_version }}"></script>
   {% if debug %}
     <script src="{% static "live-reload.js" %}"></script>

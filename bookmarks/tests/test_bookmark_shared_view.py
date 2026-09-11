@@ -660,6 +660,31 @@ class BookmarkSharedViewTestCase(
         self.assertIsNotNone(feed)
         self.assertEqual(feed.attrs["href"], reverse("linkding:feeds.public_shared"))
 
+    def test_includes_public_shared_rss_feed_with_known_user(self):
+        user1 = self.setup_user(enable_sharing=True, enable_public_sharing=True)
+
+        url = reverse("linkding:bookmarks.shared") + "?user=" + user1.username
+        response = self.client.get(url)
+        soup = self.make_soup(response.content.decode())
+
+        feed = soup.select_one('head link[type="application/rss+xml"]')
+        self.assertIsNotNone(feed)
+        expected_url = (
+            reverse("linkding:feeds.public_shared")
+            + "?"
+            + urllib.parse.urlencode({"user": user1.username})
+        )
+        self.assertEqual(feed.attrs["href"], expected_url)
+
+    def test_includes_public_shared_rss_feed_with_unknown_user(self):
+        url = reverse("linkding:bookmarks.shared") + "?user=unknownuser"
+        response = self.client.get(url)
+        soup = self.make_soup(response.content.decode())
+
+        feed = soup.select_one('head link[type="application/rss+xml"]')
+        self.assertIsNotNone(feed)
+        self.assertEqual(feed.attrs["href"], reverse("linkding:feeds.public_shared"))
+
     def test_tag_menu_visible_for_authenticated_user(self):
         self.authenticate()
 

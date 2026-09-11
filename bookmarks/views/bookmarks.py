@@ -16,6 +16,7 @@ from bookmarks.forms import BookmarkForm
 from bookmarks.models import (
     Bookmark,
     BookmarkSearch,
+    User,
 )
 from bookmarks.services import assets as asset_actions
 from bookmarks.services import tasks
@@ -138,9 +139,24 @@ def shared(request: HttpRequest):
             "tag_cloud": tag_cloud,
             "details": bookmark_details,
             "user_list": user_list,
-            "rss_feed_url": reverse("linkding:feeds.public_shared"),
+            "rss_feed_url": build_public_shared_feed_url(
+                "linkding:feeds.public_shared", search
+            ),
+            "atom_feed_url": build_public_shared_feed_url(
+                "linkding:feeds.public_shared_atom", search
+            ),
         },
     )
+
+
+def build_public_shared_feed_url(view_name: str, search: BookmarkSearch) -> str:
+    url = reverse(view_name)
+    # Only carry the user filter over into the feed URL if it actually
+    # resolves to a known user, so the feed URL doesn't 404 on an unknown
+    # or mistyped username.
+    if search.user and User.objects.filter(username=search.user).exists():
+        url += "?" + urllib.parse.urlencode({"user": search.user})
+    return url
 
 
 def shared_update(request: HttpRequest):

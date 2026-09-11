@@ -1,6 +1,14 @@
 from django.http import Http404
 
-from bookmarks.models import ApiToken, Bookmark, BookmarkAsset, BookmarkBundle, Toast
+from bookmarks.models import (
+    ApiToken,
+    Bookmark,
+    BookmarkAsset,
+    BookmarkBundle,
+    FeedToken,
+    Toast,
+    User,
+)
 from bookmarks.type_defs import HttpRequest
 
 
@@ -43,6 +51,17 @@ def bundle_write(request: HttpRequest, bundle_id: int | str):
         raise Http404("Bundle does not exist") from None
 
 
+def bundle_read_for_user(user: User, bundle_id: int | str):
+    # Authorizes a bundle against a specific user rather than the logged-in
+    # session user. Used by feeds, which are typically requested by an
+    # external reader that only presents the feed token in the URL and has
+    # no Linkding session at all.
+    try:
+        return BookmarkBundle.objects.get(pk=bundle_id, owner=user)
+    except (BookmarkBundle.DoesNotExist, ValueError):
+        raise Http404("Bundle does not exist") from None
+
+
 def asset_read(request: HttpRequest, asset_id: int | str):
     try:
         asset = BookmarkAsset.objects.get(pk=asset_id)
@@ -72,3 +91,10 @@ def api_token_write(request: HttpRequest, token_id: int | str):
         return ApiToken.objects.get(id=token_id, user=request.user)
     except (ApiToken.DoesNotExist, ValueError):
         raise Http404("API token does not exist") from None
+
+
+def feed_token_write(request: HttpRequest, token_key: str):
+    try:
+        return FeedToken.objects.get(pk=token_key, user=request.user)
+    except FeedToken.DoesNotExist:
+        raise Http404("Feed token does not exist") from None
