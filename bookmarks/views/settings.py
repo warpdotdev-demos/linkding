@@ -175,14 +175,16 @@ def integrations(request):
         messages.get_messages(request), "api_success_message"
     )
 
-    feed_token = FeedToken.objects.get_or_create(user=request.user)[0]
+    # Matches the previous lazy single-token behavior: a user that doesn't
+    # have a feed token yet (new user, or upgrading from before named feed
+    # tokens existed) gets one created on first visit.
+    if not FeedToken.objects.filter(user=request.user).exists():
+        FeedToken.objects.create(user=request.user, name="Default feed token")
 
-    all_feed_url = reverse("linkding:feeds.all", args=[feed_token.key])
-    all_feed_atom_url = reverse("linkding:feeds.all_atom", args=[feed_token.key])
-    unread_feed_url = reverse("linkding:feeds.unread", args=[feed_token.key])
-    unread_feed_atom_url = reverse("linkding:feeds.unread_atom", args=[feed_token.key])
-    shared_feed_url = reverse("linkding:feeds.shared", args=[feed_token.key])
-    shared_feed_atom_url = reverse("linkding:feeds.shared_atom", args=[feed_token.key])
+    feed_tokens = FeedToken.objects.filter(user=request.user).order_by("-created")
+    feed_success_message = _find_message_with_tag(
+        messages.get_messages(request), "feed_success_message"
+    )
     public_shared_feed_url = reverse("linkding:feeds.public_shared")
     public_shared_feed_atom_url = reverse("linkding:feeds.public_shared_atom")
 
@@ -195,16 +197,49 @@ def integrations(request):
             "api_token_key": api_token_key,
             "api_token_name": api_token_name,
             "api_success_message": api_success_message,
-            "all_feed_url": all_feed_url,
-            "all_feed_atom_url": all_feed_atom_url,
-            "unread_feed_url": unread_feed_url,
-            "unread_feed_atom_url": unread_feed_atom_url,
-            "shared_feed_url": shared_feed_url,
-            "shared_feed_atom_url": shared_feed_atom_url,
+            "feed_tokens": feed_tokens,
+            "feed_success_message": feed_success_message,
             "public_shared_feed_url": public_shared_feed_url,
             "public_shared_feed_atom_url": public_shared_feed_atom_url,
         },
     )
+
+
+@login_required
+def create_feed_token(request):
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        if not name:
+            name = "Feed token"
+
+        token = FeedToken(user=request.user, name=name)
+        token.save()
+
+        messages.success(
+            request,
+            f'Feed token "{token.name}" created successfully',
+            "feed_success_message",
+        )
+
+        return HttpResponseRedirect(reverse("linkding:settings.integrations"))
+
+    return render(request, "settings/create_feed_token_modal.html")
+
+
+@login_required
+def delete_feed_token(request):
+    if request.method == "POST":
+        token_key = request.POST.get("token_key")
+        token = access.feed_token_write(request, token_key)
+        token_name = token.name
+        token.delete()
+        messages.success(
+            request,
+            f'Feed token "{token_name}" has been deleted.',
+            "feed_success_message",
+        )
+
+    return HttpResponseRedirect(reverse("linkding:settings.integrations"))
 
 
 @login_required

@@ -20,6 +20,7 @@ from bookmarks.models import (
     Bookmark,
     BookmarkAsset,
     BookmarkBundle,
+    FeedToken,
     Tag,
     User,
 )
@@ -290,6 +291,15 @@ class BookmarkFactoryMixin:
         if not name:
             name = get_random_string(length=32)
         token = ApiToken(user=user, name=name)
+        token.save()
+        return token
+
+    def setup_feed_token(self, user: User = None, name: str = ""):
+        if user is None:
+            user = self.get_or_create_test_user()
+        if not name:
+            name = get_random_string(length=32)
+        token = FeedToken(user=user, name=name)
         token.save()
         return token
 

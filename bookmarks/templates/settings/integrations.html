@@ -183,34 +183,84 @@
       })();
     </script>
     </turbo-frame>
+    <turbo-frame id="feed-section">
     <section aria-labelledby="feeds-heading">
       <h2 id="feeds-heading">Feeds</h2>
-      <p>The following URLs provide RSS and Atom feeds for your bookmarks:</p>
+      {% if feed_success_message %}
+        <div class="toast toast-success mb-2">{{ feed_success_message }}</div>
+      {% endif %}
+      <p>
+        Feed tokens provide RSS and Atom feeds for your bookmarks. <strong>Please treat feed tokens as you would any
+        other credential.</strong> Any party with access to a feed URL can read the bookmarks it exposes.
+      </p>
+      {% if feed_tokens %}
+        <form method="post"
+              action="{% url 'linkding:settings.integrations.delete_feed_token' %}"
+              data-turbo-frame="feed-section">
+          <table class="table crud-table mb-6">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Created</th>
+                <th>Feeds</th>
+                <th class="actions">
+                  <span class="text-assistive">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for token in feed_tokens %}
+                <tr>
+                  <td>{{ token.name }}</td>
+                  <td>{{ token.created|date:"M d, Y H:i" }}</td>
+                  <td>
+                    <ul style="list-style-position: outside;">
+                      <li>
+                        All bookmarks:
+                        <a target="_blank" href="{% url 'linkding:feeds.all' token.key %}">RSS</a> /
+                        <a target="_blank" href="{% url 'linkding:feeds.all_atom' token.key %}">Atom</a>
+                      </li>
+                      <li>
+                        Unread bookmarks:
+                        <a target="_blank" href="{% url 'linkding:feeds.unread' token.key %}">RSS</a> /
+                        <a target="_blank"
+                           href="{% url 'linkding:feeds.unread_atom' token.key %}">Atom</a>
+                      </li>
+                      <li>
+                        Shared bookmarks:
+                        <a target="_blank" href="{% url 'linkding:feeds.shared' token.key %}">RSS</a> /
+                        <a target="_blank"
+                           href="{% url 'linkding:feeds.shared_atom' token.key %}">Atom</a>
+                      </li>
+                    </ul>
+                  </td>
+                  <td class="actions">
+                    {% csrf_token %}
+                    <button data-confirm
+                            name="token_key"
+                            value="{{ token.key }}"
+                            type="submit"
+                            class="btn btn-link">Delete</button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </form>
+      {% endif %}
+      <a class="btn"
+         href="{% url 'linkding:settings.integrations.create_feed_token' %}"
+         data-turbo-frame="feed-modal">Create feed token</a>
+      <h3>Public shared feed</h3>
       <ul style="list-style-position: outside;">
         <li>
-          All bookmarks:
-          <a target="_blank" href="{{ all_feed_url }}">RSS</a> /
-          <a target="_blank" href="{{ all_feed_atom_url }}">Atom</a>
-        </li>
-        <li>
-          Unread bookmarks:
-          <a target="_blank" href="{{ unread_feed_url }}">RSS</a> /
-          <a target="_blank" href="{{ unread_feed_atom_url }}">Atom</a>
-        </li>
-        <li>
-          Shared bookmarks:
-          <a target="_blank" href="{{ shared_feed_url }}">RSS</a> /
-          <a target="_blank" href="{{ shared_feed_atom_url }}">Atom</a>
-        </li>
-        <li>
-          Public shared bookmarks:
           <a target="_blank" href="{{ public_shared_feed_url }}">RSS</a> /
           <a target="_blank" href="{{ public_shared_feed_atom_url }}">Atom</a>
           <br>
           <span class="text-small text-secondary">The public shared feed does not contain an authentication token and can be shared with other people. Only shows shared bookmarks from users who have explicitly enabled public sharing. Add a <code>user</code> parameter to limit the feed to a single user's public bookmarks, e.g. <code>?user=jane</code>.</span>
         </li>
       </ul>
-      <p>All URLs support the following URL parameters:</p>
+      <p>All feed URLs above support the following URL parameters:</p>
       <ul style="list-style-position: outside;">
         <li>
           A <code>limit</code> parameter for specifying the maximum number of bookmarks to include in the feed. By
@@ -238,13 +288,11 @@
         </li>
       </ul>
       <p>
-        <strong>Please note that these URLs include an authentication token that should be treated like any other
-        credential.</strong>
-        Any party with access to these URLs can read all your bookmarks.
-        If you think that a URL was compromised you can delete the feed token for your user in the <a target="_blank"
-    href="{% url 'admin:bookmarks_feedtoken_changelist' %}">admin panel</a>.
-        After deleting the feed token, new URLs will be generated when you reload this settings page.
+        <strong>Deleting a feed token immediately revokes every URL built with it,</strong> without affecting your
+        other feed tokens.
       </p>
     </section>
+    <turbo-frame id="feed-modal"></turbo-frame>
+    </turbo-frame>
   </main>
 {% endblock %}

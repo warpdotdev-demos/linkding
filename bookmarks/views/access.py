@@ -5,6 +5,7 @@ from bookmarks.models import (
     Bookmark,
     BookmarkAsset,
     BookmarkBundle,
+    FeedToken,
     Toast,
     User,
 )
@@ -90,3 +91,10 @@ def api_token_write(request: HttpRequest, token_id: int | str):
         return ApiToken.objects.get(id=token_id, user=request.user)
     except (ApiToken.DoesNotExist, ValueError):
         raise Http404("API token does not exist") from None
+
+
+def feed_token_write(request: HttpRequest, token_key: str):
+    try:
+        return FeedToken.objects.get(pk=token_key, user=request.user)
+    except FeedToken.DoesNotExist:
+        raise Http404("Feed token does not exist") from None

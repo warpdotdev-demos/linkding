@@ -310,9 +310,10 @@ class AdminToast(admin.ModelAdmin):
 
 
 class AdminFeedToken(admin.ModelAdmin):
-    list_display = ("key", "user")
-    search_fields = ["key"]
+    list_display = ("name", "key", "user", "created")
+    search_fields = ["key", "name", "user__username"]
     list_filter = ("user__username",)
+    ordering = ("-created",)
 
 
 class ApiTokenAdminForm(forms.ModelForm):

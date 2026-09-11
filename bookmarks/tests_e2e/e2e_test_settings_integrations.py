@@ -63,3 +63,50 @@ class SettingsIntegrationsE2ETestCase(LinkdingE2ETestCase):
 
         # Verify the token is removed from the table
         expect(token_table.get_by_text("Token To Delete")).not_to_be_visible()
+
+    def test_create_feed_token(self):
+        self.open(reverse("linkding:settings.integrations"))
+
+        # Click create feed token button
+        self.page.get_by_text("Create feed token").click()
+
+        # Wait for modal to appear
+        modal = self.page.locator(".modal")
+        expect(modal).to_be_visible()
+
+        # Enter custom token name
+        token_name_input = modal.locator("#feed-token-name")
+        token_name_input.fill("")
+        token_name_input.fill("My Feed Token")
+
+        # Confirm the dialog
+        modal.page.get_by_role("button", name="Create Token").click()
+
+        # Verify the dialog is gone
+        expect(modal).to_be_hidden()
+
+        # Verify the feed token is now listed in the table, along with its
+        # RSS and Atom feed links
+        feed_section = self.page.locator("#feed-section")
+        feed_token_row = feed_section.locator("tr").filter(has_text="My Feed Token")
+        expect(feed_token_row).to_be_visible()
+        expect(feed_token_row.get_by_role("link", name="RSS").first).to_be_visible()
+        expect(feed_token_row.get_by_role("link", name="Atom").first).to_be_visible()
+
+    def test_delete_feed_token(self):
+        self.setup_feed_token(name="Feed Token To Delete")
+
+        self.open(reverse("linkding:settings.integrations"))
+
+        feed_section = self.page.locator("#feed-section")
+        expect(feed_section.get_by_text("Feed Token To Delete")).to_be_visible()
+
+        # Click delete button for the token
+        token_row = feed_section.locator("tr").filter(has_text="Feed Token To Delete")
+        token_row.get_by_role("button", name="Delete").click()
+
+        # Confirm deletion
+        self.locate_confirm_dialog().get_by_text("Confirm").click()
+
+        # Verify the token is removed from the table
+        expect(feed_section.get_by_text("Feed Token To Delete")).not_to_be_visible()

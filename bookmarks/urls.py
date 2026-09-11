@@ -84,6 +84,16 @@ urlpatterns = [
         settings_views.delete_api_token,
         name="settings.integrations.delete_api_token",
     ),
+    path(
+        "settings/integrations/create-feed-token",
+        settings_views.create_feed_token,
+        name="settings.integrations.create_feed_token",
+    ),
+    path(
+        "settings/integrations/delete-feed-token",
+        settings_views.delete_feed_token,
+        name="settings.integrations.delete_feed_token",
+    ),
     path("settings/import", settings_views.bookmark_import, name="settings.import"),
     path("settings/export", settings_views.bookmark_export, name="settings.export"),
     # Toasts
