@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from django.contrib.auth.models import User
 from django.contrib.syndication.views import Feed
 from django.db.models import QuerySet, prefetch_related_objects
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.urls import reverse
 
 from bookmarks import queries
@@ -35,12 +35,15 @@ def qualify_with_user(text: str, user: User | None) -> str:
 
 
 class BaseBookmarksFeed(Feed):
+    # Whether `?bundle=<id>` is honored by this feed. Only a feed token
+    # owner's own `all`/`unread` feeds support scoping to one of their
+    # bundles; shared feeds reject it outright so the parameter can't be
+    # used to probe for the existence of someone else's bundle.
+    supports_bundle = False
+
     def get_object(self, request, feed_key: str | None):
         feed_token = FeedToken.objects.get(key__exact=feed_key) if feed_key else None
-        bundle = None
-        bundle_id = request.GET.get("bundle")
-        if bundle_id:
-            bundle = access.bundle_read(request, bundle_id)
+        bundle = self.get_bundle(request, feed_token)
 
         search = BookmarkSearch(
             q=request.GET.get("q", ""),
@@ -51,6 +54,19 @@ class BaseBookmarksFeed(Feed):
         user = self.get_user(request, feed_token)
         query_set = self.get_query_set(feed_token, search, user)
         return FeedContext(request, feed_token, user, query_set)
+
+    def get_bundle(self, request, feed_token: FeedToken | None):
+        bundle_id = request.GET.get("bundle")
+        if not bundle_id:
+            return None
+        if not self.supports_bundle:
+            # Don't reveal whether a bundle exists on feeds that don't
+            # support scoping to one.
+            raise Http404("Bundle does not exist")
+        # Authorize the bundle against the feed token's owner rather than
+        # the logged-in session user, since a feed is typically requested
+        # by an external reader that only presents the token in the URL.
+        return access.bundle_read_for_user(feed_token.user, bundle_id)
 
     def get_user(self, request, feed_token: FeedToken | None) -> User | None:
         return None
@@ -85,6 +101,7 @@ class BaseBookmarksFeed(Feed):
 class AllBookmarksFeed(BaseBookmarksFeed):
     title = "All bookmarks"
     description = "All bookmarks"
+    supports_bundle = True
 
     def get_query_set(
         self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
@@ -98,6 +115,7 @@ class AllBookmarksFeed(BaseBookmarksFeed):
 class UnreadBookmarksFeed(BaseBookmarksFeed):
     title = "Unread bookmarks"
     description = "All unread bookmarks"
+    supports_bundle = True
 
     def get_query_set(
         self, feed_token: FeedToken, search: BookmarkSearch, user: User | None

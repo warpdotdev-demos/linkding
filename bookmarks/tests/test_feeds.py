@@ -468,3 +468,57 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
             reverse("linkding:feeds.all", args=[self.token.key]) + "?bundle=invalid"
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_with_bundle_token_only(self):
+        # A feed reader that only presents the token URL and never
+        # authenticated with a Linkding session must still be able to use an
+        # owned bundle. Regression test for the token-only bundle
+        # authorization defect described in the spec.
+        self.client.logout()
+
+        tag1 = self.setup_tag()
+        visible_bookmarks = [
+            self.setup_bookmark(tags=[tag1]),
+            self.setup_bookmark(tags=[tag1]),
+        ]
+        self.setup_bookmark()
+
+        bundle = self.setup_bundle(all_tags=tag1.name)
+
+        response = self.client.get(
+            reverse("linkding:feeds.all", args=[self.token.key])
+            + f"?bundle={bundle.id}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFeedItems(response, visible_bookmarks)
+
+    def test_with_bundle_not_owned_by_user_token_only(self):
+        self.client.logout()
+
+        other_user = User.objects.create_user(
+            "otheruser", "otheruser@example.com", "password123"
+        )
+        other_bundle = self.setup_bundle(user=other_user, search="test")
+
+        response = self.client.get(
+            reverse("linkding:feeds.all", args=[self.token.key])
+            + f"?bundle={other_bundle.id}"
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_shared_rejects_bundle(self):
+        bundle = self.setup_bundle(search="test")
+
+        response = self.client.get(
+            reverse("linkding:feeds.shared", args=[self.token.key])
+            + f"?bundle={bundle.id}"
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_public_shared_rejects_bundle(self):
+        bundle = self.setup_bundle(search="test")
+
+        response = self.client.get(
+            reverse("linkding:feeds.public_shared") + f"?bundle={bundle.id}"
+        )
+        self.assertEqual(response.status_code, 404)
