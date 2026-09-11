@@ -144,14 +144,26 @@ class UnreadBookmarksAtomFeed(UnreadBookmarksFeed):
 
 
 class SharedBookmarksFeed(BaseBookmarksFeed):
-    title = "Shared bookmarks"
-    description = "All shared bookmarks"
+    base_title = "Shared bookmarks"
+    base_description = "All shared bookmarks"
+
+    def get_user(self, request, feed_token: FeedToken | None) -> User | None:
+        username = request.GET.get("user")
+        if not username:
+            return None
+        return User.objects.get(username=username)
+
+    def title(self, context: FeedContext):
+        return qualify_with_user(self.base_title, context.user)
+
+    def description(self, context: FeedContext):
+        return qualify_with_user(self.base_description, context.user)
 
     def get_query_set(
         self, feed_token: FeedToken, search: BookmarkSearch, user: User | None
     ):
         return queries.query_shared_bookmarks(
-            None, feed_token.user.profile, search, False
+            user, feed_token.user.profile, search, False
         )
 
     def link(self, context: FeedContext):

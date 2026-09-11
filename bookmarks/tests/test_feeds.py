@@ -224,6 +224,105 @@ class FeedsTestCase(TestCase, BookmarkFactoryMixin):
         self.assertEqual(response.status_code, 200)
         self.assertFeedItems(response, shared_bookmarks)
 
+    def test_shared_metadata_with_user(self):
+        user1 = self.setup_user(enable_sharing=True)
+
+        feed_url = (
+            reverse("linkding:feeds.shared", args=[self.token.key])
+            + f"?user={user1.username}"
+        )
+        response = self.client.get(feed_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, f"<title>Shared bookmarks by {user1.username}</title>"
+        )
+        self.assertContains(
+            response,
+            f"<description>All shared bookmarks by {user1.username}</description>",
+        )
+
+    def test_shared_user_filter_returns_only_that_users_bookmarks(self):
+        user1 = self.setup_user(enable_sharing=True)
+        user2 = self.setup_user(enable_sharing=True)
+
+        self.setup_bookmark(shared=True, user=user2)
+        user1_bookmarks = [
+            self.setup_bookmark(shared=True, user=user1, description="test"),
+            self.setup_bookmark(shared=True, user=user1, description="test"),
+        ]
+
+        response = self.client.get(
+            reverse("linkding:feeds.shared", args=[self.token.key])
+            + f"?user={user1.username}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFeedItems(response, user1_bookmarks)
+
+    def test_shared_user_filter_can_include_non_public_bookmarks(self):
+        # The authenticated shared feed can return a user's shared bookmarks
+        # even when that user hasn't enabled public sharing, since the feed
+        # itself requires a valid feed token.
+        user1 = self.setup_user(enable_sharing=True, enable_public_sharing=False)
+        bookmarks = [self.setup_bookmark(shared=True, user=user1)]
+
+        response = self.client.get(
+            reverse("linkding:feeds.shared", args=[self.token.key])
+            + f"?user={user1.username}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFeedItems(response, bookmarks)
+
+    def test_shared_user_filter_excludes_unshared_bookmarks(self):
+        user1 = self.setup_user(enable_sharing=True)
+        self.setup_bookmark(shared=False, user=user1)
+
+        response = self.client.get(
+            reverse("linkding:feeds.shared", args=[self.token.key])
+            + f"?user={user1.username}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<item>", count=0)
+
+    def test_shared_user_filter_excludes_bookmarks_when_sharing_disabled(self):
+        user1 = self.setup_user(enable_sharing=False)
+        self.setup_bookmark(shared=True, user=user1)
+
+        response = self.client.get(
+            reverse("linkding:feeds.shared", args=[self.token.key])
+            + f"?user={user1.username}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<item>", count=0)
+
+    def test_shared_unknown_user_returns_404(self):
+        response = self.client.get(
+            reverse("linkding:feeds.shared", args=[self.token.key])
+            + "?user=unknownuser"
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_shared_atom_user_filter_matches_rss(self):
+        user1 = self.setup_user(enable_sharing=True)
+        user2 = self.setup_user(enable_sharing=True)
+
+        self.setup_bookmark(shared=True, user=user2)
+        user1_bookmarks = [
+            self.setup_bookmark(shared=True, user=user1, description="test"),
+        ]
+
+        rss_response = self.client.get(
+            reverse("linkding:feeds.shared", args=[self.token.key])
+            + f"?user={user1.username}"
+        )
+        atom_response = self.client.get(
+            reverse("linkding:feeds.shared_atom", args=[self.token.key])
+            + f"?user={user1.username}"
+        )
+        self.assertEqual(rss_response.status_code, 200)
+        self.assertEqual(atom_response.status_code, 200)
+        self.assertFeedItems(rss_response, user1_bookmarks)
+        self.assertAtomFeedItems(atom_response, user1_bookmarks)
+
     def test_public_shared_does_not_require_auth(self):
         response = self.client.get(reverse("linkding:feeds.public_shared"))
 
