@@ -133,18 +133,34 @@ class SettingsIntegrationsViewTestCase(TestCase, BookmarkFactoryMixin, HtmlTestM
 
         token = FeedToken.objects.first()
         self.assertInHTML(
-            f'<a target="_blank" href="/feeds/{token.key}/all">All bookmarks</a>',
+            f'<a target="_blank" href="/feeds/{token.key}/all">RSS</a>',
             html,
         )
         self.assertInHTML(
-            f'<a target="_blank" href="/feeds/{token.key}/unread">Unread bookmarks</a>',
+            f'<a target="_blank" href="/feeds/{token.key}/all.atom">Atom</a>',
             html,
         )
         self.assertInHTML(
-            f'<a target="_blank" href="/feeds/{token.key}/shared">Shared bookmarks</a>',
+            f'<a target="_blank" href="/feeds/{token.key}/unread">RSS</a>',
             html,
         )
         self.assertInHTML(
-            '<a target="_blank" href="/feeds/shared">Public shared bookmarks</a>',
+            f'<a target="_blank" href="/feeds/{token.key}/unread.atom">Atom</a>',
+            html,
+        )
+        self.assertInHTML(
+            f'<a target="_blank" href="/feeds/{token.key}/shared">RSS</a>',
+            html,
+        )
+        self.assertInHTML(
+            f'<a target="_blank" href="/feeds/{token.key}/shared.atom">Atom</a>',
+            html,
+        )
+        self.assertInHTML(
+            '<a target="_blank" href="/feeds/shared">RSS</a>',
+            html,
+        )
+        self.assertInHTML(
+            '<a target="_blank" href="/feeds/shared.atom">Atom</a>',
             html,
         )

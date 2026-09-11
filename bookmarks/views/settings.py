@@ -178,9 +178,13 @@ def integrations(request):
     feed_token = FeedToken.objects.get_or_create(user=request.user)[0]
 
     all_feed_url = reverse("linkding:feeds.all", args=[feed_token.key])
+    all_feed_atom_url = reverse("linkding:feeds.all_atom", args=[feed_token.key])
     unread_feed_url = reverse("linkding:feeds.unread", args=[feed_token.key])
+    unread_feed_atom_url = reverse("linkding:feeds.unread_atom", args=[feed_token.key])
     shared_feed_url = reverse("linkding:feeds.shared", args=[feed_token.key])
+    shared_feed_atom_url = reverse("linkding:feeds.shared_atom", args=[feed_token.key])
     public_shared_feed_url = reverse("linkding:feeds.public_shared")
+    public_shared_feed_atom_url = reverse("linkding:feeds.public_shared_atom")
 
     return render(
         request,
@@ -192,9 +196,13 @@ def integrations(request):
             "api_token_name": api_token_name,
             "api_success_message": api_success_message,
             "all_feed_url": all_feed_url,
+            "all_feed_atom_url": all_feed_atom_url,
             "unread_feed_url": unread_feed_url,
+            "unread_feed_atom_url": unread_feed_atom_url,
             "shared_feed_url": shared_feed_url,
+            "shared_feed_atom_url": shared_feed_atom_url,
             "public_shared_feed_url": public_shared_feed_url,
+            "public_shared_feed_atom_url": public_shared_feed_atom_url,
         },
     )
 

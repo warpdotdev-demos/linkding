@@ -6,6 +6,7 @@ from django.contrib.syndication.views import Feed
 from django.db.models import QuerySet, prefetch_related_objects
 from django.http import Http404, HttpRequest
 from django.urls import reverse
+from django.utils.feedgenerator import Atom1Feed
 
 from bookmarks import queries
 from bookmarks.models import Bookmark, BookmarkSearch, FeedToken, UserProfile
@@ -112,6 +113,13 @@ class AllBookmarksFeed(BaseBookmarksFeed):
         return reverse("linkding:feeds.all", args=[context.feed_token.key])
 
 
+class AllBookmarksAtomFeed(AllBookmarksFeed):
+    feed_type = Atom1Feed
+
+    def link(self, context: FeedContext):
+        return reverse("linkding:feeds.all_atom", args=[context.feed_token.key])
+
+
 class UnreadBookmarksFeed(BaseBookmarksFeed):
     title = "Unread bookmarks"
     description = "All unread bookmarks"
@@ -128,6 +136,13 @@ class UnreadBookmarksFeed(BaseBookmarksFeed):
         return reverse("linkding:feeds.unread", args=[context.feed_token.key])
 
 
+class UnreadBookmarksAtomFeed(UnreadBookmarksFeed):
+    feed_type = Atom1Feed
+
+    def link(self, context: FeedContext):
+        return reverse("linkding:feeds.unread_atom", args=[context.feed_token.key])
+
+
 class SharedBookmarksFeed(BaseBookmarksFeed):
     title = "Shared bookmarks"
     description = "All shared bookmarks"
@@ -141,6 +156,13 @@ class SharedBookmarksFeed(BaseBookmarksFeed):
 
     def link(self, context: FeedContext):
         return reverse("linkding:feeds.shared", args=[context.feed_token.key])
+
+
+class SharedBookmarksAtomFeed(SharedBookmarksFeed):
+    feed_type = Atom1Feed
+
+    def link(self, context: FeedContext):
+        return reverse("linkding:feeds.shared_atom", args=[context.feed_token.key])
 
 
 class PublicSharedBookmarksFeed(BaseBookmarksFeed):
@@ -169,3 +191,10 @@ class PublicSharedBookmarksFeed(BaseBookmarksFeed):
 
     def link(self, context: FeedContext):
         return reverse("linkding:feeds.public_shared")
+
+
+class PublicSharedBookmarksAtomFeed(PublicSharedBookmarksFeed):
+    feed_type = Atom1Feed
+
+    def link(self, context: FeedContext):
+        return reverse("linkding:feeds.public_shared_atom")

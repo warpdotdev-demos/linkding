@@ -101,12 +101,32 @@ urlpatterns = [
     # Feeds
     path("feeds/<str:feed_key>/all", feeds.AllBookmarksFeed(), name="feeds.all"),
     path(
+        "feeds/<str:feed_key>/all.atom",
+        feeds.AllBookmarksAtomFeed(),
+        name="feeds.all_atom",
+    ),
+    path(
         "feeds/<str:feed_key>/unread", feeds.UnreadBookmarksFeed(), name="feeds.unread"
+    ),
+    path(
+        "feeds/<str:feed_key>/unread.atom",
+        feeds.UnreadBookmarksAtomFeed(),
+        name="feeds.unread_atom",
     ),
     path(
         "feeds/<str:feed_key>/shared", feeds.SharedBookmarksFeed(), name="feeds.shared"
     ),
+    path(
+        "feeds/<str:feed_key>/shared.atom",
+        feeds.SharedBookmarksAtomFeed(),
+        name="feeds.shared_atom",
+    ),
     path("feeds/shared", feeds.PublicSharedBookmarksFeed(), name="feeds.public_shared"),
+    path(
+        "feeds/shared.atom",
+        feeds.PublicSharedBookmarksAtomFeed(),
+        name="feeds.public_shared_atom",
+    ),
     # Health check
     path("health", health_view, name="health"),
     # Manifest

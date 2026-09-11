@@ -183,23 +183,31 @@
       })();
     </script>
     </turbo-frame>
-    <section aria-labelledby="rss-feeds-heading">
-      <h2 id="rss-feeds-heading">RSS Feeds</h2>
-      <p>The following URLs provide RSS feeds for your bookmarks:</p>
+    <section aria-labelledby="feeds-heading">
+      <h2 id="feeds-heading">Feeds</h2>
+      <p>The following URLs provide RSS and Atom feeds for your bookmarks:</p>
       <ul style="list-style-position: outside;">
         <li>
-          <a target="_blank" href="{{ all_feed_url }}">All bookmarks</a>
+          All bookmarks:
+          <a target="_blank" href="{{ all_feed_url }}">RSS</a> /
+          <a target="_blank" href="{{ all_feed_atom_url }}">Atom</a>
         </li>
         <li>
-          <a target="_blank" href="{{ unread_feed_url }}">Unread bookmarks</a>
+          Unread bookmarks:
+          <a target="_blank" href="{{ unread_feed_url }}">RSS</a> /
+          <a target="_blank" href="{{ unread_feed_atom_url }}">Atom</a>
         </li>
         <li>
-          <a target="_blank" href="{{ shared_feed_url }}">Shared bookmarks</a>
+          Shared bookmarks:
+          <a target="_blank" href="{{ shared_feed_url }}">RSS</a> /
+          <a target="_blank" href="{{ shared_feed_atom_url }}">Atom</a>
         </li>
         <li>
-          <a target="_blank" href="{{ public_shared_feed_url }}">Public shared bookmarks</a>
+          Public shared bookmarks:
+          <a target="_blank" href="{{ public_shared_feed_url }}">RSS</a> /
+          <a target="_blank" href="{{ public_shared_feed_atom_url }}">Atom</a>
           <br>
-          <span class="text-small text-secondary">The public shared feed does not contain an authentication token and can be shared with other people. Only shows shared bookmarks from users who have explicitly enabled public sharing.</span>
+          <span class="text-small text-secondary">The public shared feed does not contain an authentication token and can be shared with other people. Only shows shared bookmarks from users who have explicitly enabled public sharing. Add a <code>user</code> parameter to limit the feed to a single user's public bookmarks, e.g. <code>?user=jane</code>.</span>
         </li>
       </ul>
       <p>All URLs support the following URL parameters:</p>
@@ -219,6 +227,14 @@
         <li>
           A <code>shared</code> parameter for filtering for shared or unshared bookmarks. Use <code>yes</code> for
           shared bookmarks and <code>no</code> for unshared bookmarks.
+        </li>
+        <li>
+          A <code>bundle</code> parameter for scoping your <em>All bookmarks</em> and <em>Unread bookmarks</em> feeds
+          to one of your bundles, by ID. Not supported on the shared feeds.
+        </li>
+        <li>
+          A <code>user</code> parameter for scoping the shared feeds to a single user's shared bookmarks, by
+          username. Returns a 404 for an unknown username. Not supported on your own bookmarks feeds.
         </li>
       </ul>
       <p>

@@ -142,6 +142,9 @@ def shared(request: HttpRequest):
             "rss_feed_url": build_public_shared_feed_url(
                 "linkding:feeds.public_shared", search
             ),
+            "atom_feed_url": build_public_shared_feed_url(
+                "linkding:feeds.public_shared_atom", search
+            ),
         },
     )
 
