@@ -60,6 +60,11 @@ class LinkdingE2ETestCase(LiveServerTestCase, BookmarkFactoryMixin):
     def setup_browser(self) -> BrowserContext:
         self._ensure_playwright()
         context = self.browser.new_context()
+        # Allow tests to read back clipboard content written via
+        # navigator.clipboard.writeText(), e.g. for "copy URL" buttons.
+        context.grant_permissions(
+            ["clipboard-read", "clipboard-write"], origin=self.live_server_url
+        )
         context.add_cookies(
             [
                 {
