@@ -43,6 +43,8 @@ from bookmarks.views import access, contexts, turbo
 def index(request: HttpRequest):
     if request.method == "POST":
         return search_action(request)
+    if request.GET.get("search_scope") == "all":
+        return search_all_redirect(request)
 
     search = BookmarkSearch.from_request(
         request, request.GET, request.user_profile.search_preferences
@@ -82,6 +84,8 @@ def index_update(request: HttpRequest):
 def archived(request: HttpRequest):
     if request.method == "POST":
         return search_action(request)
+    if request.GET.get("search_scope") == "all":
+        return search_all_redirect(request)
 
     search = BookmarkSearch.from_request(
         request, request.GET, request.user_profile.search_preferences
@@ -191,6 +195,18 @@ def render_bookmarks_update(request, bookmark_list, tag_cloud, details):
             method="morph",
         ),
     )
+
+
+def search_all_redirect(request: HttpRequest):
+    params = request.GET.copy()
+    for key in ("bundle", "page", "details", "search_scope"):
+        params.pop(key, None)
+    search = BookmarkSearch.from_request(
+        request, params, request.user_profile.search_preferences
+    )
+    query_string = urllib.parse.urlencode(search.query_params)
+    url = request.path if not query_string else request.path + "?" + query_string
+    return HttpResponseRedirect(url)
 
 
 def search_action(request: HttpRequest):

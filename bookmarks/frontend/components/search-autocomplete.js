@@ -20,6 +20,8 @@ export class SearchAutocomplete extends TurboLitElement {
     user: { type: String },
     shared: { type: String },
     unread: { type: String },
+    bundle: { type: String },
+    bundleName: { type: String, attribute: "bundle-name" },
     target: { type: String },
     isFocus: { state: true },
     isOpen: { state: true },
@@ -33,6 +35,8 @@ export class SearchAutocomplete extends TurboLitElement {
     this.inputPlaceholder = "";
     this.inputValue = "";
     this.mode = "";
+    this.bundle = "";
+    this.bundleName = "";
     this.target = "_blank";
     this.isFocus = false;
     this.isOpen = false;
@@ -177,6 +181,7 @@ export class SearchAutocomplete extends TurboLitElement {
         user: this.user,
         shared: this.shared,
         unread: this.unread,
+        bundle: this.bundle,
         q: this.inputValue,
       };
       const fetchedBookmarks = await api.listBookmarks(suggestionSearch, {
@@ -290,6 +295,23 @@ export class SearchAutocomplete extends TurboLitElement {
             ? "is-focused"
             : ""}"
         >
+          ${this.bundle
+            ? html`
+                <button
+                  type="submit"
+                  class="btn btn-sm search-scope-chip"
+                  name="search_scope"
+                  value="all"
+                  aria-label="Search all bookmarks, remove bundle filter: ${this
+                    .bundleName}"
+                  title="${this.bundleName}"
+                >
+                  <span>In:</span>
+                  <span class="bundle-name">${this.bundleName}</span>
+                  <span aria-hidden="true">×</span>
+                </button>
+              `
+            : ""}
           <input
             type="search"
             class="form-input"

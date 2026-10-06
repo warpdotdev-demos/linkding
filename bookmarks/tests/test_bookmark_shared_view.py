@@ -19,6 +19,27 @@ class BookmarkSharedViewTestCase(
         user = self.get_or_create_test_user()
         self.client.force_login(user)
 
+    def test_scope_control_absent_on_shared_view(self):
+        self.authenticate()
+        bundle = self.setup_bundle()
+        for params in ({}, {"bundle": bundle.id, "search_scope": "all"}):
+            response = self.client.get(reverse("linkding:bookmarks.shared"), params)
+            self.assertEqual(response.status_code, 200)
+            component = self.make_soup(response.content.decode()).select_one(
+                "ld-search-autocomplete"
+            )
+            self.assertNotIn("bundle", component.attrs)
+            self.assertNotIn("bundle-name", component.attrs)
+        self.client.logout()
+        response = self.client.get(
+            reverse("linkding:bookmarks.shared"), {"search_scope": "all"}
+        )
+        self.assertEqual(response.status_code, 200)
+        component = self.make_soup(response.content.decode()).select_one(
+            "ld-search-autocomplete"
+        )
+        self.assertNotIn("bundle", component.attrs)
+
     def assertBookmarkCount(
         self, html: str, bookmark: Bookmark, count: int, link_target: str = "_blank"
     ):
