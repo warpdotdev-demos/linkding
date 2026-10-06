@@ -94,3 +94,11 @@ class BookmarkSearchFormTest(TestCase, BookmarkFactoryMixin):
         )
         form = BookmarkSearchForm(search, editable_fields=["q", "user"])
         self.assertCountEqual(form.hidden_fields(), [form["sort"]])
+
+        # Scope is URL-driven and stays hidden for ordinary query submissions.
+        bundle = self.setup_bundle()
+        form = BookmarkSearchForm(BookmarkSearch(bundle=bundle), editable_fields=["q"])
+        self.assertCountEqual(form.hidden_fields(), [form["bundle"]])
+        form = BookmarkSearchForm(BookmarkSearch(), editable_fields=["q"])
+        self.assertEqual(form.hidden_fields(), [])
+        self.assertNotIn("search_scope", form.fields)

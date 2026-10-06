@@ -5,6 +5,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from bookmarks.models import BookmarkSearch, UserProfile
+from bookmarks.tests.bundle_search_scope import BundleSearchScopeTestMixin
 from bookmarks.tests.helpers import (
     BookmarkFactoryMixin,
     BookmarkListTestMixin,
@@ -13,8 +14,15 @@ from bookmarks.tests.helpers import (
 
 
 class BookmarkArchivedViewTestCase(
-    TestCase, BookmarkFactoryMixin, BookmarkListTestMixin, TagCloudTestMixin
+    BundleSearchScopeTestMixin,
+    TestCase,
+    BookmarkFactoryMixin,
+    BookmarkListTestMixin,
+    TagCloudTestMixin,
 ):
+    scope_view = "linkding:bookmarks.archived"
+    scope_archived = True
+
     def setUp(self) -> None:
         user = self.get_or_create_test_user()
         self.client.force_login(user)

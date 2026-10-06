@@ -89,6 +89,28 @@ class BookmarksApiTestCase(LinkdingApiTestCase, BookmarkFactoryMixin):
         )
         self.assertBookmarkListEqual(response.data["results"], bookmarks)
 
+    def assert_bundle_scope_matches_search(self, archived):
+        self.authenticate()
+        inside = self.setup_bookmark(title="History inside", is_archived=archived)
+        outside = self.setup_bookmark(title="History outside", is_archived=archived)
+        self.setup_bookmark(title="History opposite view", is_archived=not archived)
+        self.setup_bookmark(
+            title="History foreign", is_archived=archived, user=self.setup_user()
+        )
+        self.setup_bookmark(title="Unrelated inside", is_archived=archived)
+        bundle = self.setup_bundle(search="inside")
+        route = "linkding:bookmark-archived" if archived else "linkding:bookmark-list"
+        response = self.get(reverse(route) + f"?bundle={bundle.id}&q=History")
+        self.assertBookmarkListEqual(response.data["results"], [inside])
+        response = self.get(reverse(route) + "?q=History")
+        self.assertBookmarkListEqual(response.data["results"], [inside, outside])
+
+    def test_list_bundle_scope_matches_search(self):
+        self.assert_bundle_scope_matches_search(archived=False)
+
+    def test_archived_bundle_scope_matches_search(self):
+        self.assert_bundle_scope_matches_search(archived=True)
+
     def test_list_bookmarks_with_more_details(self):
         self.authenticate()
         bookmarks = self.setup_numbered_bookmarks(
