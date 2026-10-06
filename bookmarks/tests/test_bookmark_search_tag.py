@@ -108,6 +108,52 @@ class BookmarkSearchTagTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         )
         self.assertHiddenInput(search_form, "unread", BookmarkSearch.FILTER_UNREAD_YES)
 
+    def test_bundle_scope_controls(self):
+        bundle = self.setup_bundle(name='<Work & "Reading">')
+        for mode, label in (
+            ("", "All bookmarks"),
+            ("archived", "All archived bookmarks"),
+        ):
+            soup = self.make_soup(
+                self.render_template(
+                    f"/test?bundle={bundle.id}&q=python&unread=off&sort=title_asc",
+                    mode=mode,
+                )
+            )
+            control = soup.select_one("ld-search-autocomplete")
+            self.assertEqual(control["scope-name"], bundle.name)
+            self.assertEqual(control["bundle"], str(bundle.id))
+            self.assertEqual(control["remove-label"], f"Search {label.lower()}")
+            self.assertEqual(control["sort"], "title_asc")
+            self.assertIsNone(soup.select_one("work"))
+            for form in soup.select("form"):
+                self.assertNoHiddenInput(form, "return_bundle")
+                self.assertHiddenInput(form, "bundle", str(bundle.id))
+            soup = self.make_soup(
+                self.render_template(
+                    f"/test?return_bundle={bundle.id}&q=django",
+                    mode=mode,
+                )
+            )
+            control = soup.select_one("ld-search-autocomplete")
+            self.assertEqual(control["scope-label"], label)
+            self.assertEqual(control["return-name"], bundle.name)
+            self.assertIn("q=django", control["return-url"])
+            for form in soup.select("form"):
+                self.assertHiddenInput(form, "return_bundle", str(bundle.id))
+                self.assertNoHiddenInput(form, "bundle")
+        soup = self.make_soup(
+            self.render_template(
+                f"/test?return_bundle={bundle.id}",
+                mode="shared",
+            )
+        )
+        control = soup.select_one("ld-search-autocomplete")
+        self.assertNotIn("scope-label", control.attrs)
+        self.assertNotIn("return-url", control.attrs)
+        for form in soup.select("form"):
+            self.assertNoHiddenInput(form, "return_bundle")
+
     def test_preferences_form_inputs(self):
         # Without params
         url = "/test"

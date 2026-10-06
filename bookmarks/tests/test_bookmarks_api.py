@@ -89,6 +89,73 @@ class BookmarksApiTestCase(LinkdingApiTestCase, BookmarkFactoryMixin):
         )
         self.assertBookmarkListEqual(response.data["results"], bookmarks)
 
+    def test_autocomplete_scope_filter_contract(self):
+        self.authenticate()
+        bundle = self.setup_bundle(
+            search="inside",
+            all_tags="reading",
+            filter_unread="yes",
+            filter_shared="yes",
+        )
+        tag = self.setup_tag(name="reading")
+        other = self.setup_user()
+        for archived in (False, True):
+            inside = self.setup_numbered_bookmarks(
+                6,
+                prefix=f"inside python {archived}",
+                archived=archived,
+                unread=True,
+                shared=True,
+            )
+            for bookmark in inside:
+                bookmark.tags.add(tag)
+            outside = self.setup_bookmark(
+                title=f"outside python {archived}",
+                is_archived=archived,
+                unread=True,
+                shared=True,
+            )
+            self.setup_bookmark(
+                title="python private",
+                user=other,
+                is_archived=archived,
+                unread=True,
+                shared=True,
+            )
+            self.setup_bookmark(title="python filtered", is_archived=archived)
+            endpoint = reverse(
+                "linkding:bookmark-archived" if archived else "linkding:bookmark-list"
+            )
+            for legacy in (False, True):
+                self.user.profile.legacy_search = legacy
+                self.user.profile.search_preferences = {"unread": "no", "shared": "no"}
+                self.user.profile.save()
+                params = {
+                    "q": "python",
+                    "unread": "yes",
+                    "shared": "yes",
+                    "sort": "title_asc",
+                    "added_since": "2020-01-01",
+                    "modified_since": "2020-01-01",
+                    "limit": 5,
+                    "offset": 0,
+                    "bundle": bundle.id,
+                }
+                response = self.client.get(endpoint, params)
+                self.assertEqual(response.data["count"], 6)
+                self.assertEqual(len(response.data["results"]), 5)
+                self.assertTrue(
+                    {item["id"] for item in response.data["results"]}
+                    <= {bookmark.id for bookmark in inside}
+                )
+                params.pop("bundle")
+                params["sort"] = "title_desc"
+                response = self.client.get(endpoint, params)
+                self.assertEqual(response.data["count"], 7)
+                self.assertEqual(response.data["results"][0]["id"], outside.id)
+                params["added_since"] = "2099-01-01"
+                self.assertEqual(self.client.get(endpoint, params).data["count"], 0)
+
     def test_list_bookmarks_with_more_details(self):
         self.authenticate()
         bookmarks = self.setup_numbered_bookmarks(
