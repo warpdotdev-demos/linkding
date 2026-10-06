@@ -134,6 +134,75 @@ class BundleSearchScopeE2ETest(LinkdingE2ETestCase):
         self.page.go_forward()
         self.assert_scope(True)
 
+    def test_back_link_preserves_native_modified_clicks(self):
+        self.open(
+            reverse("linkding:bookmarks.index")
+            + f"?return_bundle={self.bundle.id}&q=Python&sort=title_asc"
+        )
+        for archived in (False, True):
+            route = reverse(
+                "linkding:bookmarks.archived"
+                if archived
+                else "linkding:bookmarks.index"
+            )
+            self.page.goto(
+                self.live_server_url
+                + route
+                + f"?return_bundle={self.bundle.id}&q=Python&sort=title_asc"
+            )
+            self.input().fill("inside")
+            back = self.page.get_by_role("link", name="Back to Reading")
+            original_url = self.page.url
+            for click_options in (
+                {"modifiers": ["Control"]},
+                {"modifiers": ["Shift"]},
+                {"button": "middle"},
+            ):
+                with self.subTest(archived=archived, click_options=click_options):
+                    with self.context.expect_page(timeout=5000) as new_page:
+                        back.click(**click_options)
+                    popup = new_page.value
+                    popup.wait_for_url(
+                        lambda url, expected=route: urlsplit(url).path == expected
+                    )
+                    popup.wait_for_load_state()
+                    popup.bring_to_front()
+                    self.assertEqual(urlsplit(popup.url).path, route)
+                    self.assertEqual(
+                        parse_qs(urlsplit(popup.url).query),
+                        {
+                            "bundle": [str(self.bundle.id)],
+                            "q": ["Python"],
+                            "sort": ["title_asc"],
+                        },
+                    )
+                    expect(popup.locator(".search-scope-name")).to_have_text(
+                        "In: Reading"
+                    )
+                    popup.close()
+                    self.page.bring_to_front()
+                    self.assertEqual(self.page.url, original_url)
+                    expect(self.input()).to_have_value("inside")
+            for modifier in ("metaKey", "altKey"):
+                with self.subTest(archived=archived, modifier=modifier):
+                    prevented = back.evaluate(
+                        """(element, modifier) => {
+                            let prevented;
+                            element.addEventListener("click", event => {
+                                prevented = event.defaultPrevented;
+                                // Suppress the native action after observing the handler.
+                                event.preventDefault();
+                            }, { once: true });
+                            element.dispatchEvent(new MouseEvent("click", {
+                                bubbles: true, cancelable: true, [modifier]: true,
+                            }));
+                            return prevented;
+                        }""",
+                        modifier,
+                    )
+                    self.assertFalse(prevented)
+                    self.assertEqual(self.page.url, original_url)
+
     def test_autocomplete_follows_scope(self):
         user = self.get_or_create_test_user()
         user.profile.search_preferences = {"unread": "yes", "sort": "title_asc"}

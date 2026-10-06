@@ -374,7 +374,7 @@ class RemoveTagItem:
 
     @staticmethod
     def _generate_query_string_legacy(context: RequestContext, tag: Tag) -> str:
-        params = context.request.GET.copy()
+        params = context.query_params.copy()
         if params.__contains__("q"):
             # Split query string into parts
             query_string = params.__getitem__("q")

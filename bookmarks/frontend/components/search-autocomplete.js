@@ -98,6 +98,12 @@ export class SearchAutocomplete extends TurboLitElement {
   }
 
   changeScope(e, target) {
+    if (
+      e.currentTarget instanceof HTMLAnchorElement &&
+      (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+    ) {
+      return;
+    }
     e.preventDefault();
     const url = new URL(target, window.location.origin);
     const query = this.input.value;
