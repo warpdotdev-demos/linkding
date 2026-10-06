@@ -1,16 +1,18 @@
 {% load static shared %}
 <div class="search-container">
   <form id="search" action="" method="get" role="search">
+    {# Keep the neutral submitter first so implicit Enter stays bundle-scoped. #}
+    <input type="submit" value="Search" class="d-none">
     <ld-search-autocomplete input-name="q"
                             input-placeholder="Search for words or #tags"
                             input-value="{{ search.q|default_if_none:'' }}"
                             target="{{ request.user_profile.bookmark_link_target }}"
                             mode="{{ mode }}"
+                            {% if mode != 'shared' and search.bundle %}bundle="{{ search.bundle.id }}" bundle-name="{{ search.bundle.name }}"{% endif %}
                             user="{{ search.user }}"
                             shared="{{ search.shared }}"
                             unread="{{ search.unread }}">
     </ld-search-autocomplete>
-    <input type="submit" value="Search" class="d-none">
     {% for hidden_field in search_form.hidden_fields %}{{ hidden_field }}{% endfor %}
   </form>
   <ld-dropdown class="search-options dropdown dropdown-right">

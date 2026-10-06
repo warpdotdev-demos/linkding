@@ -66,6 +66,20 @@ history rome not (#article or #book)
 ```
 Search bookmarks that contain both "history" and "rome", but are not tagged with either "article" or "book".
 
+## Bundle scope
+
+When you open a bundle, searches and bookmark suggestions stay within that bundle.
+Pressing Enter in the search field keeps this scope (unless you have selected an autocomplete suggestion).
+
+To search all your bookmarks, activate the **In: &lt;bundle name&gt; ×** chip in the search field.
+This immediately submits the text currently in the field, including completed tags, without the bundle's rules.
+It keeps your current active or archived view, independent filters, and saved search preferences.
+An empty search lists bookmarks under those remaining filters.
+
+The global results URL no longer contains the bundle, and the sidebar no longer selects it.
+Use a bundle link to return to scoped search, or use your browser's Back button to restore the previous scoped URL.
+The chip is also available when bundles or the sidebar are hidden.
+
 ## Legacy Search
 
 A new search engine that supports the above expressions was introduced in linkding v1.44.0.
