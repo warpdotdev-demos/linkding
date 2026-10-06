@@ -3,6 +3,9 @@ from functools import reduce
 from django import template
 from django.core.paginator import Page
 from django.http import QueryDict
+from django.urls import reverse
+
+from bookmarks.services.search_scope import SearchScope
 
 NUM_ADJACENT_PAGES = 2
 
@@ -19,6 +22,14 @@ def pagination(context, page: Page):
     query_params = request.GET.copy()
     query_params.pop("page", None)
     query_params.pop("details", None)
+    mode = (
+        "shared"
+        if request.path == reverse("linkding:bookmarks.shared")
+        else "archived"
+        if request.path == reverse("linkding:bookmarks.archived")
+        else ""
+    )
+    SearchScope(request, request.GET, mode).normalize_origin(query_params)
 
     prev_link = (
         _generate_link(base_url, query_params, page.previous_page_number())

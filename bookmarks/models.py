@@ -327,14 +327,14 @@ class BookmarkSearch:
 
     @staticmethod
     def from_request(request: any, query_dict: QueryDict, preferences: dict = None):
+        from bookmarks.services.search_scope import resolve_bundle
+
         initial_values = {}
         for param in BookmarkSearch.params:
             value = query_dict.get(param)
             if value:
                 if param == "bundle":
-                    initial_values[param] = BookmarkBundle.objects.filter(
-                        owner=request.user, pk=value
-                    ).first()
+                    initial_values[param] = resolve_bundle(request.user, value)
                 else:
                     initial_values[param] = value
 

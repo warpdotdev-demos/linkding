@@ -10,11 +10,18 @@ from bookmarks.tests.helpers import (
     BookmarkListTestMixin,
     TagCloudTestMixin,
 )
+from bookmarks.tests.search_scope_helpers import SearchScopeViewTestMixin
 
 
 class BookmarkArchivedViewTestCase(
-    TestCase, BookmarkFactoryMixin, BookmarkListTestMixin, TagCloudTestMixin
+    SearchScopeViewTestMixin,
+    TestCase,
+    BookmarkFactoryMixin,
+    BookmarkListTestMixin,
+    TagCloudTestMixin,
 ):
+    scope_mode = "archived"
+
     def setUp(self) -> None:
         user = self.get_or_create_test_user()
         self.client.force_login(user)

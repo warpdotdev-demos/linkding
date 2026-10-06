@@ -10,10 +10,15 @@ from bookmarks.tests.helpers import (
     BookmarkListTestMixin,
     TagCloudTestMixin,
 )
+from bookmarks.tests.search_scope_helpers import SearchScopeViewTestMixin
 
 
 class BookmarkIndexViewTestCase(
-    TestCase, BookmarkFactoryMixin, BookmarkListTestMixin, TagCloudTestMixin
+    SearchScopeViewTestMixin,
+    TestCase,
+    BookmarkFactoryMixin,
+    BookmarkListTestMixin,
+    TagCloudTestMixin,
 ):
     def setUp(self) -> None:
         user = self.get_or_create_test_user()
@@ -38,7 +43,7 @@ class BookmarkIndexViewTestCase(
         bundle_list = soup.select_one("ul.bundle-menu")
         self.assertIsNotNone(bundle_list)
 
-        list_items = bundle_list.select("li.bundle-menu-item")
+        list_items = bundle_list.select("li.bundle-menu-item")[1:]
         self.assertEqual(len(list_items), len(bundles))
 
         for index, list_item in enumerate(list_items):

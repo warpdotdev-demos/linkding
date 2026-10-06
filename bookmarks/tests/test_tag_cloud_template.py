@@ -1,4 +1,4 @@
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.http import HttpResponse
@@ -486,6 +486,76 @@ class TagCloudTemplateTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         """,
             rendered_template,
         )
+
+    def test_legacy_selected_tag_url_normalizes_return_bundle(self):
+        user = self.get_or_create_test_user()
+        user.profile.legacy_search = True
+        user.profile.enable_sharing = True
+        user.profile.save()
+        tag = self.setup_tag(name="tag1")
+        for archived in (False, True):
+            self.setup_bookmark(
+                tags=[tag],
+                title="term1",
+                description="term2",
+                shared=True,
+                is_archived=archived,
+            )
+        origin = self.setup_bundle()
+        active_bundle = self.setup_bundle()
+        foreign = self.setup_bundle(user=self.setup_user())
+        deleted = self.setup_bundle()
+        deleted_id = deleted.id
+        deleted.delete()
+        cases = [
+            ({"return_bundle": f"000{origin.id}"}, str(origin.id)),
+            ({"return_bundle": ["bad", str(origin.id)]}, str(origin.id)),
+            ({"bundle": active_bundle.id, "return_bundle": origin.id}, None),
+            ({"return_bundle": "bad"}, None),
+            ({"return_bundle": "-1"}, None),
+            ({"return_bundle": str(2**63)}, None),
+            ({"return_bundle": foreign.id}, None),
+            ({"return_bundle": deleted_id}, None),
+        ]
+        for context_type in (
+            contexts.ActiveTagCloudContext,
+            contexts.ArchivedTagCloudContext,
+            contexts.SharedTagCloudContext,
+        ):
+            for scope_params, expected_origin in cases:
+                with self.subTest(
+                    context=context_type.__name__, scope_params=scope_params
+                ):
+                    params = {
+                        "q": "term1 #tag1 term2",
+                        "sort": "title_asc",
+                        "shared": "yes",
+                        "unread": "off",
+                        "page": 2,
+                        "details": 5,
+                        **scope_params,
+                    }
+                    rendered = self.render_template(
+                        context_type=context_type,
+                        url="/test?" + urlencode(params, doseq=True),
+                    )
+                    links = self.make_soup(rendered).select("p.selected-tags a")
+                    self.assertEqual(len(links), 1)
+                    actual = parse_qs(urlparse(links[0]["href"]).query)
+                    expected = {
+                        "q": ["term1 term2"],
+                        "sort": ["title_asc"],
+                        "shared": ["yes"],
+                        "unread": ["off"],
+                    }
+                    if "bundle" in scope_params:
+                        expected["bundle"] = [str(active_bundle.id)]
+                    if (
+                        expected_origin is not None
+                        and context_type != contexts.SharedTagCloudContext
+                    ):
+                        expected["return_bundle"] = [expected_origin]
+                    self.assertEqual(actual, expected)
 
     def test_tag_link_query_string_round_trips_names_with_parentheses(self):
         # Clicking a tag must produce a query string that resolves back to that

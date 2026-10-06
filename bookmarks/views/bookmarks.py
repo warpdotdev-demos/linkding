@@ -34,6 +34,7 @@ from bookmarks.services.bookmarks import (
     unshare_bookmarks,
     untag_bookmarks,
 )
+from bookmarks.services.search_scope import SearchScope
 from bookmarks.type_defs import HttpRequest
 from bookmarks.utils import get_safe_return_url
 from bookmarks.views import access, contexts, turbo
@@ -48,7 +49,7 @@ def index(request: HttpRequest):
         request, request.GET, request.user_profile.search_preferences
     )
     bookmark_list = contexts.ActiveBookmarkListContext(request, search)
-    bundles = contexts.BundlesContext(request)
+    bundles = contexts.BundlesContext(request, search)
     tag_cloud = contexts.ActiveTagCloudContext(request, search)
     bookmark_details = contexts.get_details_context(
         request, contexts.ActiveBookmarkDetailsContext
@@ -87,7 +88,7 @@ def archived(request: HttpRequest):
         request, request.GET, request.user_profile.search_preferences
     )
     bookmark_list = contexts.ArchivedBookmarkListContext(request, search)
-    bundles = contexts.BundlesContext(request)
+    bundles = contexts.BundlesContext(request, search, "archived")
     tag_cloud = contexts.ArchivedTagCloudContext(request, search)
     bookmark_details = contexts.get_details_context(
         request, contexts.ArchivedBookmarkDetailsContext
@@ -207,6 +208,16 @@ def search_action(request: HttpRequest):
     )
     base_url = request.path
     query_params = search.query_params
+    mode = (
+        "shared"
+        if request.path == reverse("linkding:bookmarks.shared")
+        else "archived"
+        if request.path == reverse("linkding:bookmarks.archived")
+        else ""
+    )
+    SearchScope(request, request.POST, mode, search.bundle).normalize_origin(
+        query_params
+    )
     query_string = urllib.parse.urlencode(query_params)
     url = base_url if not query_string else base_url + "?" + query_string
     return HttpResponseRedirect(url)

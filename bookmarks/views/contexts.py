@@ -25,6 +25,7 @@ from bookmarks.services.search_query_parser import (
     parse_search_query,
     strip_tag_from_query,
 )
+from bookmarks.services.search_scope import SearchScope
 from bookmarks.services.wayback import generate_fallback_webarchive_url
 from bookmarks.type_defs import HttpRequest
 from bookmarks.views import access
@@ -42,6 +43,14 @@ class RequestContext:
         self.action_url = reverse(self.action_view)
         self.query_params = request.GET.copy()
         self.query_params.pop("details", None)
+        mode = (
+            "shared"
+            if self.index_view == "linkding:bookmarks.shared"
+            else "archived"
+            if self.index_view == "linkding:bookmarks.archived"
+            else ""
+        )
+        SearchScope(request, request.GET, mode).normalize_origin(self.query_params)
 
         self.query_is_valid = True
         self.query_error_message = None
@@ -365,7 +374,7 @@ class RemoveTagItem:
 
     @staticmethod
     def _generate_query_string_legacy(context: RequestContext, tag: Tag) -> str:
-        params = context.request.GET.copy()
+        params = context.query_params.copy()
         if params.__contains__("q"):
             # Split query string into parts
             query_string = params.__getitem__("q")
@@ -646,7 +655,7 @@ def get_details_context(
 
 
 class BundlesContext:
-    def __init__(self, request: HttpRequest) -> None:
+    def __init__(self, request: HttpRequest, search: BookmarkSearch, mode="") -> None:
         self.request = request
         self.user = request.user
         self.user_profile = request.user_profile
@@ -656,13 +665,9 @@ class BundlesContext:
         )
         self.is_empty = len(self.bundles) == 0
 
-        selected_bundle_id = (
-            int(request.GET.get("bundle")) if request.GET.get("bundle") else None
-        )
-        self.selected_bundle = next(
-            (bundle for bundle in self.bundles if bundle.id == selected_bundle_id),
-            None,
-        )
+        self.scope = SearchScope(request, request.GET, mode, search.bundle)
+        self.selected_bundle = self.scope.bundle
+        self.all_bookmarks_url = self.scope.unbundle_url
 
 
 class UserListContext:
