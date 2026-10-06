@@ -9,7 +9,7 @@ Keep bundle-scoped search as the default. Add a removable scope chip that lets a
 - Interview decision: Killian approved options `1A, 2A, 3A, 4A` and the scope exclusions.
 - Repository: `warpdotdev-demos/linkding`; base branch: `master`.
 - Code references use base commit `7e5eaf656bca4e10c4a78106b0de3a410d9531fe`.
-- Status: product choices agreed; this specification awaits requester review. This PR does not implement the feature.
+- Status: approved by Killian Jackson ([review](https://github.com/warpdotdev-demos/linkding/pull/49#pullrequestreview-5424412702)); implementation is included on this branch and PR.
 
 ## Product behavior
 1. **Bundle search remains the default.**

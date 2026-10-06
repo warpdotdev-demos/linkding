@@ -8,7 +8,11 @@
                             mode="{{ mode }}"
                             user="{{ search.user }}"
                             shared="{{ search.shared }}"
-                            unread="{{ search.unread }}">
+                            unread="{{ search.unread }}"
+                            sort="{{ search.sort }}"
+                            modified-since="{{ search.modified_since|default_if_none:'' }}"
+                            added-since="{{ search.added_since|default_if_none:'' }}"
+                            {% if scope.enabled %} bundle="{{ scope.bundle.id|default_if_none:'' }}" scope-name="{{ scope.bundle.name|default_if_none:'' }}" scope-label="{{ scope.label }}" remove-label="{{ scope.remove_label }}" unbundle-url="{{ scope.unbundle_url }}" return-name="{{ scope.origin.name|default_if_none:'' }}" return-url="{{ scope.return_url }}" {% endif %}>
     </ld-search-autocomplete>
     <input type="submit" value="Search" class="d-none">
     {% for hidden_field in search_form.hidden_fields %}{{ hidden_field }}{% endfor %}

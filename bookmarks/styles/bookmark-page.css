@@ -15,6 +15,20 @@
     grid-gap: var(--unit-9);
   }
 
+  & form#search {
+    flex: 1 1 0;
+    width: 0;
+  }
+
+  & ld-search-autocomplete {
+    display: block;
+    min-width: 0;
+  }
+
+  & .search-options {
+    flex: 0 0 auto;
+  }
+
   ld-filter-drawer-trigger {
     display: none;
   }
@@ -45,14 +59,22 @@
 }
 
 /* Bookmark area header controls */
+.bookmarks-page main {
+  min-width: 0;
+}
+.bookmarks-page .header-controls {
+  min-width: 0;
+}
 .bookmarks-page .search-container {
   flex: 1 1 0;
   display: flex;
-  max-width: 300px;
+  max-width: 420px;
+  min-width: 0;
   margin-left: auto;
 
   & form {
     width: 100%;
+    min-width: 0;
   }
 
   @media (max-width: 600px) {
@@ -61,7 +83,7 @@
   }
 
   /* Group search options button with search button */
-  height: var(--control-size);
+  min-height: var(--control-size);
   border-radius: var(--border-radius);
   box-shadow: var(--box-shadow-xs);
 
@@ -78,6 +100,59 @@
     border-bottom-left-radius: 0;
     box-shadow: none;
     outline-offset: calc(var(--focus-outline-offset) * -1);
+  }
+
+  & .form-autocomplete-input {
+    flex-wrap: nowrap;
+    gap: var(--unit-1);
+  }
+
+  & input[type="search"] {
+    min-width: 0;
+    width: 0;
+    flex: 1 1 auto;
+  }
+
+  & .search-scope-chip {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 1 auto;
+    max-width: 50%;
+    min-width: 0;
+    padding-left: var(--unit-1);
+    border-radius: var(--border-radius);
+    background: var(--body-color-contrast);
+    color: var(--text-color);
+    font-size: var(--font-size-sm);
+  }
+
+  & .search-scope-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  & .search-scope-remove {
+    flex: 0 0 auto;
+    padding: 0 var(--unit-1);
+    height: auto;
+    border: none;
+  }
+
+  & .search-scope-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--unit-1) var(--unit-2);
+    padding-top: var(--unit-1);
+    font-size: var(--font-size-sm);
+    color: var(--secondary-text-color);
+  }
+
+  & .search-scope-row a {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   /* Search option menu styles */

@@ -20,6 +20,16 @@ export class SearchAutocomplete extends TurboLitElement {
     user: { type: String },
     shared: { type: String },
     unread: { type: String },
+    bundle: { type: String },
+    sort: { type: String },
+    modifiedSince: { type: String, attribute: "modified-since" },
+    addedSince: { type: String, attribute: "added-since" },
+    scopeName: { type: String, attribute: "scope-name" },
+    scopeLabel: { type: String, attribute: "scope-label" },
+    removeLabel: { type: String, attribute: "remove-label" },
+    unbundleUrl: { type: String, attribute: "unbundle-url" },
+    returnName: { type: String, attribute: "return-name" },
+    returnUrl: { type: String, attribute: "return-url" },
     target: { type: String },
     isFocus: { state: true },
     isOpen: { state: true },
@@ -45,6 +55,7 @@ export class SearchAutocomplete extends TurboLitElement {
     this.selectedIndex = undefined;
     this.input = null;
     this.menu = null;
+    this.suggestionRequest = 0;
     this.searchHistory = new SearchHistory();
     this.debouncedLoadSuggestions = debounce(() => this.loadSuggestions());
   }
@@ -57,7 +68,8 @@ export class SearchAutocomplete extends TurboLitElement {
     this.searchHistory.pushCurrent();
     this.updateSuggestions();
     this.positionController = new PositionController({
-      anchor: this.input,
+      // Keep the scope/Back row outside the suggestion overlay.
+      anchor: this.scopeLabel ? this : this.input,
       overlay: this.menu,
       autoWidth: true,
       placement: "bottom-start",
@@ -67,6 +79,35 @@ export class SearchAutocomplete extends TurboLitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.close();
+  }
+  updated(changed) {
+    const searchAttributes = [
+      "inputValue",
+      "mode",
+      "user",
+      "bundle",
+      "sort",
+      "shared",
+      "unread",
+      "modifiedSince",
+      "addedSince",
+    ];
+    if (searchAttributes.some((name) => changed.has(name))) {
+      this.close();
+    }
+  }
+
+  changeScope(e, target) {
+    e.preventDefault();
+    const url = new URL(target, window.location.origin);
+    const query = this.input.value;
+    if (query) {
+      url.searchParams.set("q", query);
+    } else {
+      url.searchParams.delete("q");
+    }
+    this.close();
+    window.Turbo.visit(url.href);
   }
 
   handleFocus() {
@@ -121,10 +162,11 @@ export class SearchAutocomplete extends TurboLitElement {
   }
 
   close() {
+    this.suggestionRequest++;
     this.isOpen = false;
     this.updateSuggestions();
     this.selectedIndex = undefined;
-    this.positionController.disable();
+    this.positionController?.disable();
   }
 
   hasSuggestions() {
@@ -132,6 +174,9 @@ export class SearchAutocomplete extends TurboLitElement {
   }
 
   async loadSuggestions() {
+    if (!this.isConnected || !this.input) return;
+    const request = ++this.suggestionRequest;
+    const query = this.inputValue;
     let suggestionIndex = 0;
 
     function nextIndex() {
@@ -160,7 +205,7 @@ export class SearchAutocomplete extends TurboLitElement {
 
     // Recent search suggestions
     const recentSearches = this.searchHistory
-      .getRecentSearches(this.inputValue, 5)
+      .getRecentSearches(query, 5)
       .map((value) => ({
         type: "search",
         index: nextIndex(),
@@ -171,14 +216,22 @@ export class SearchAutocomplete extends TurboLitElement {
     // Bookmark suggestions
     let bookmarks = [];
 
-    if (this.inputValue && this.inputValue.length >= 3) {
+    if (query && query.length >= 3) {
       const path = this.mode ? `/${this.mode}` : "";
       const suggestionSearch = {
         user: this.user,
         shared: this.shared,
         unread: this.unread,
-        q: this.inputValue,
+        q: query,
       };
+      if (this.mode !== "shared") {
+        Object.assign(suggestionSearch, {
+          sort: this.sort,
+          modified_since: this.modifiedSince,
+          added_since: this.addedSince,
+        });
+        if (this.bundle) suggestionSearch.bundle = this.bundle;
+      }
       const fetchedBookmarks = await api.listBookmarks(suggestionSearch, {
         limit: 5,
         offset: 0,
@@ -196,6 +249,13 @@ export class SearchAutocomplete extends TurboLitElement {
       });
     }
 
+    if (
+      request !== this.suggestionRequest ||
+      query !== this.inputValue ||
+      !this.isConnected
+    ) {
+      return;
+    }
     this.updateSuggestions(recentSearches, bookmarks, tagSuggestions);
 
     if (this.hasSuggestions()) {
@@ -233,6 +293,7 @@ export class SearchAutocomplete extends TurboLitElement {
         inputValue.substring(0, bounds.start) +
         `#${suggestion.tagName} ` +
         inputValue.substring(bounds.end);
+      this.inputValue = this.input.value;
       this.close();
     }
   }
@@ -290,6 +351,24 @@ export class SearchAutocomplete extends TurboLitElement {
             ? "is-focused"
             : ""}"
         >
+          ${this.scopeName
+            ? html`
+                <span class="search-scope-chip">
+                  <span class="search-scope-name" title=${this.scopeName}
+                    >In: ${this.scopeName}</span
+                  >
+                  <button
+                    type="button"
+                    class="btn btn-link search-scope-remove"
+                    aria-label=${this.removeLabel}
+                    title=${this.removeLabel}
+                    @click=${(e) => this.changeScope(e, this.unbundleUrl)}
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </span>
+              `
+            : ""}
           <input
             type="search"
             class="form-input"
@@ -313,6 +392,23 @@ export class SearchAutocomplete extends TurboLitElement {
           ${this.renderSuggestions(this.suggestions.bookmarks, "Bookmarks")}
         </ul>
       </div>
+      ${this.scopeLabel && !this.scopeName
+        ? html`
+            <div class="search-scope-row">
+              <span>${this.scopeLabel}</span>
+              ${this.returnUrl
+                ? html`
+                    <a
+                      href=${this.returnUrl}
+                      title="Back to ${this.returnName}"
+                      @click=${(e) => this.changeScope(e, this.returnUrl)}
+                      >Back to ${this.returnName}</a
+                    >
+                  `
+                : ""}
+            </div>
+          `
+        : ""}
     `;
   }
 }

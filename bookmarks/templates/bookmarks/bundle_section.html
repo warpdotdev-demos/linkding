@@ -24,6 +24,9 @@
       </ld-dropdown>
     </div>
     <ul class="bundle-menu">
+      <li class="bundle-menu-item {% if not bundles.selected_bundle %}selected{% endif %}">
+        <a href="{{ bundles.all_bookmarks_url }}">All bookmarks</a>
+      </li>
       {% for bundle in bundles.bundles %}
         <li class="bundle-menu-item {% if bundle.id == bundles.selected_bundle.id %}selected{% endif %}">
           <a href="?bundle={{ bundle.id }}">{{ bundle.name }}</a>
