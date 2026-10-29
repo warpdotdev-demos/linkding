@@ -25,4 +25,5 @@ def bookmark_search(context, search: BookmarkSearch, mode: str = ""):
         "search_form": search_form,
         "preferences_form": preferences_form,
         "mode": mode,
+        "personal_mode": mode == "",
     }
