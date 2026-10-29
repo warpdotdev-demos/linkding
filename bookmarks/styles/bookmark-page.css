@@ -50,6 +50,11 @@
   min-width: 0;
   max-width: 300px;
   margin-left: auto;
+  &:has([data-search-all]) .form-autocomplete .menu.bottom-start-aligned {
+    transform: translateY(
+      calc(var(--control-size-sm) + var(--unit-2) + var(--layout-spacing-sm))
+    );
+  }
   & .search-scope {
     margin-top: var(--unit-2);
     font-size: var(--font-size-sm);

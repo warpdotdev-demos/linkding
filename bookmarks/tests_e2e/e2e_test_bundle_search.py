@@ -63,6 +63,7 @@ class BundleSearchE2ETestCase(LinkdingE2ETestCase):
             )
         )
         self.search_input().fill(query)
+        expect(self.page.locator("ld-search-autocomplete .menu.open")).to_be_visible()
         self.broaden_button().click()
         expect(self.page.locator(".search-scope-label")).to_have_text(
             "All bookmarks (not archived)"
