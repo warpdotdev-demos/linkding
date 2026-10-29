@@ -1,8 +1,10 @@
 import urllib.parse
+from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from bookmarks.models import BookmarkSearch, UserProfile
 from bookmarks.tests.helpers import (
@@ -85,6 +87,99 @@ class BookmarkIndexViewTestCase(
 
         self.assertVisibleBookmarks(response, visible_bookmarks)
         self.assertInvisibleBookmarks(response, invisible_bookmarks)
+
+    def test_unscoped_search_removes_all_bundle_conditions(self):
+        tag = self.setup_tag(name="topic")
+        any_tag = self.setup_tag(name="any")
+        all_tag = self.setup_tag(name="all")
+        excluded_tag = self.setup_tag(name="excluded")
+        inside = self.setup_bookmark(
+            title="needle bundle",
+            tags=[tag, any_tag, all_tag],
+            shared=True,
+            unread=True,
+        )
+        outside = [
+            self.setup_bookmark(
+                title="needle", tags=[tag, any_tag, all_tag], shared=True, unread=True
+            ),
+            self.setup_bookmark(
+                title="needle bundle", tags=[tag, all_tag], shared=True, unread=True
+            ),
+            self.setup_bookmark(
+                title="needle bundle", tags=[tag, any_tag], shared=True, unread=True
+            ),
+            self.setup_bookmark(
+                title="needle bundle",
+                tags=[tag, any_tag, all_tag, excluded_tag],
+                shared=True,
+                unread=True,
+            ),
+            self.setup_bookmark(
+                title="needle bundle", tags=[tag, any_tag, all_tag], shared=True
+            ),
+            self.setup_bookmark(
+                title="needle bundle", tags=[tag, any_tag, all_tag], unread=True
+            ),
+        ]
+        bundle = self.setup_bundle(
+            search="bundle",
+            any_tags="any",
+            all_tags="all",
+            excluded_tags="excluded",
+            filter_unread="yes",
+            filter_shared="yes",
+        )
+        hidden = [
+            self.setup_bookmark(title="needle", tags=[tag], is_archived=True),
+            self.setup_bookmark(title="needle", tags=[tag], user=self.setup_user()),
+            self.setup_bookmark(title="needle"),
+            self.setup_bookmark(title="different", tags=[tag]),
+            self.setup_bookmark(
+                title="needle", tags=[tag], added=timezone.now() - timedelta(days=3)
+            ),
+            self.setup_bookmark(
+                title="needle", tags=[tag], modified=timezone.now() - timedelta(days=3)
+            ),
+        ]
+        params = {
+            "q": "needle #topic",
+            "added_since": (timezone.now() - timedelta(days=1)).isoformat(),
+            "modified_since": (timezone.now() - timedelta(days=1)).isoformat(),
+            "sort": "title_asc",
+        }
+        url = reverse("linkding:bookmarks.index")
+        scoped = self.client.get(url, {**params, "bundle": bundle.id})
+        self.assertVisibleBookmarks(scoped, [inside])
+        self.assertInvisibleBookmarks(scoped, outside + hidden)
+
+        unscoped = self.client.get(url, params)
+        self.assertVisibleBookmarks(unscoped, [inside, *outside])
+        self.assertInvisibleBookmarks(unscoped, hidden)
+
+    def test_unscoped_search_keeps_saved_and_explicit_preferences(self):
+        profile = self.user.profile
+        profile.search_preferences = {
+            "unread": "yes",
+            "shared": "yes",
+            "sort": "title_asc",
+        }
+        profile.save()
+        visible = self.setup_bookmark(title="needle", unread=True, shared=True)
+        read = self.setup_bookmark(title="needle", shared=True)
+        unshared = self.setup_bookmark(title="needle", unread=True)
+        url = reverse("linkding:bookmarks.index")
+        response = self.client.get(url, {"q": "needle"})
+        self.assertVisibleBookmarks(response, [visible])
+        self.assertInvisibleBookmarks(response, [read, unshared])
+        response = self.client.get(url, {"q": "needle", "unread": "no"})
+        self.assertVisibleBookmarks(response, [read])
+        self.assertInvisibleBookmarks(response, [visible, unshared])
+        profile.refresh_from_db()
+        self.assertEqual(
+            profile.search_preferences,
+            {"unread": "yes", "shared": "yes", "sort": "title_asc"},
+        )
 
     def test_should_list_tags_for_unarchived_and_user_owned_bookmarks(self):
         other_user = User.objects.create_user(

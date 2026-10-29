@@ -1,5 +1,6 @@
 import "@hotwired/turbo";
 import "./components/bookmark-page.js";
+import "./components/bookmark-search.js";
 import "./components/clear-button.js";
 import "./components/confirm-dropdown.js";
 import "./components/details-modal.js";

@@ -108,6 +108,53 @@ class BookmarkSearchTagTest(TestCase, BookmarkFactoryMixin, HtmlTestMixin):
         )
         self.assertHiddenInput(search_form, "unread", BookmarkSearch.FILTER_UNREAD_YES)
 
+    def test_personal_search_scope_and_escape_action(self):
+        bundle = self.setup_bundle(name="<Reading & research>")
+        for query in ["", "no-match", "("]:
+            with self.subTest(query=query):
+                html = self.render_template(f"/test?bundle={bundle.id}&q={query}")
+                soup = self.make_soup(html)
+                button = soup.select_one("button[data-search-all]")
+                self.assertEqual(button["type"], "button")
+                self.assertEqual(button.text.strip(), "Search all bookmarks")
+                self.assertEqual(
+                    soup.select_one(".search-scope-label").text.strip(),
+                    f"In bundle: {bundle.name}",
+                )
+                self.assertIn(
+                    "Bookmark suggestions can come from outside this bundle.", html
+                )
+                self.assertHiddenInput(
+                    soup.select_one("#search"), "bundle", str(bundle.id)
+                )
+                self.assertNotIn(bundle.name, html)
+
+    def test_escape_action_requires_owned_bundle_in_personal_mode(self):
+        owned = self.setup_bundle()
+        other = self.setup_bundle(user=self.setup_user())
+        for mode, bundle_id in [
+            ("", None),
+            ("", other.id),
+            ("", owned.id + other.id + 100),
+            ("archived", owned.id),
+            ("shared", owned.id),
+        ]:
+            with self.subTest(mode=mode, bundle_id=bundle_id):
+                html = self.render_template(f"/test?bundle={bundle_id or ''}", mode)
+                soup = self.make_soup(html)
+                self.assertIsNone(soup.select_one("[data-search-all]"))
+                if mode:
+                    self.assertIsNone(soup.select_one(".search-scope"))
+                else:
+                    self.assertEqual(
+                        soup.select_one(".search-scope-label").text.strip(),
+                        "All bookmarks (not archived)",
+                    )
+                    self.assertIn(
+                        "Your unarchived bookmarks; current search filters still apply.",
+                        html,
+                    )
+
     def test_preferences_form_inputs(self):
         # Without params
         url = "/test"
