@@ -154,50 +154,51 @@ class BundleSearchE2ETestCase(LinkdingE2ETestCase):
         self.open(self.scoped_url(q="guide OR second", sort="title_asc"))
         for scoped in [True, False]:
             with self.subTest(scoped=scoped):
+                filters = {
+                    "sort": "title_asc",
+                    **({"bundle": self.bundle.id} if scoped else {}),
+                }
                 self.page.locator(".pagination").get_by_role(
                     "link", name="2", exact=True
                 ).click()
+                self.assert_params({"q": "guide OR second", "page": 2, **filters})
                 expect(self.page.locator(".bookmark-list > li")).to_have_count(1)
-                params = parse_qs(urlsplit(self.page.url).query)
-                self.assertEqual(
-                    params.get("bundle"), [str(self.bundle.id)] if scoped else None
-                )
-                self.assertEqual(params["sort"], ["title_asc"])
                 self.page.locator(".bookmark-list .tags a").first.click()
+                self.assert_params({"q": "(guide OR second) #topic", **filters})
                 expect(self.search_input()).to_have_value("(guide OR second) #topic")
-                self.assertNotIn("page", parse_qs(urlsplit(self.page.url).query))
                 item = self.page.locator(".bookmark-list > li").first
+                bookmark_id = item.get_attribute("data-bookmark-id")
                 item.get_by_text("View", exact=True).click()
                 modal = self.locate_details_modal()
                 expect(modal).to_be_visible()
-                self.assertIn("details", parse_qs(urlsplit(self.page.url).query))
+                self.assert_params(
+                    {"q": "(guide OR second) #topic", "details": bookmark_id, **filters}
+                )
                 modal.locator("button.close").click()
                 expect(modal).to_be_hidden()
+                self.assert_params({"q": "(guide OR second) #topic", **filters})
                 self.page.locator(".pagination").get_by_role(
                     "link", name="2", exact=True
                 ).click()
+                self.assert_params(
+                    {"q": "(guide OR second) #topic", "page": 2, **filters}
+                )
                 self.search_input().fill("guide OR second")
                 self.search_input().press("Escape")
                 self.search_input().press("Enter")
-                self.assert_params(
-                    {
-                        "q": "guide OR second",
-                        "sort": "title_asc",
-                        **({"bundle": self.bundle.id} if scoped else {}),
-                    }
-                )
+                self.assert_params({"q": "guide OR second", **filters})
                 item = self.page.locator(".bookmark-list > li").first
+                bookmark_id = item.get_attribute("data-bookmark-id")
                 item.get_by_role("button", name="Archive", exact=True).click()
-                expect(item).not_to_contain_text(
-                    "Bundle guide" if scoped else "Bundle second"
-                )
-                params = parse_qs(urlsplit(self.page.url).query)
-                self.assertEqual(
-                    params.get("bundle"), [str(self.bundle.id)] if scoped else None
-                )
-                self.assertEqual(params["sort"], ["title_asc"])
+                expect(
+                    self.page.locator(
+                        f'.bookmark-list > li[data-bookmark-id="{bookmark_id}"]'
+                    )
+                ).to_have_count(0)
+                self.assert_params({"q": "guide OR second", **filters})
                 if scoped:
                     self.broaden_button().click()
+                    self.assert_params({"q": "guide OR second", "sort": "title_asc"})
                     expect(self.broaden_button()).to_have_count(0)
 
     def test_keyboard_and_mobile_with_hidden_sidebar(self):
