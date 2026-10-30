@@ -191,6 +191,7 @@ typings/
 # Build output, etc.
 /tmp
 # Database file
+# Favicons and preview images also live here.
 /data
 # ublock + chromium
 /uBOLite.chromium.mv3
