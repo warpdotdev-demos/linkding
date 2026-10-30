@@ -1,3 +1,4 @@
+<!-- Intentional test PR; no functional changes. -->
 <div align="center">
     <br>
     <a href="https://github.com/sissbruecker/linkding">
